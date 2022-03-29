@@ -1,0 +1,4 @@
+SMP: https://www.noga-iso.co.il/Umbraco/Api/Documents/GetCosts/?startDateString=01/01/2022&endDateString=30/03/2022&culture=he-IL&dataType=SMP
+Expost: https://www.noga-iso.co.il/Umbraco/Api/Documents/GetCosts/?startDateString=01/01/2022&endDateString=30/03/2022&culture=he-IL&dataType=Cost
+Forecast (a day in advance): https://www.noga-iso.co.il/Umbraco/Api/Documents/GetCosts/?startDateString=29/03/2022&endDateString=30/03/2022&culture=he-IL&dataType=DemandForecast&forecastType=1
+Forecast (update): https://www.noga-iso.co.il/Umbraco/Api/Documents/GetCosts/?startDateString=29/03/2022&endDateString=30/03/2022&culture=he-IL&dataType=DemandForecast&forecastType=2
