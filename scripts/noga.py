@@ -26,7 +26,7 @@ def smp(start_date, end_date):
     # response = urlopen(noga_url.format(start_date, end_date))
     logging.info("Received noga/smp data with status code %s", response.status_code)
     if response.status_code >= 400:
-        logging.warning("Error:", response.reason)
+        logging.warning("Error: %s", response.reason)
         return {"error": response.reason}
     # Convert bytes to string type and string type to dict
     string = response.content.decode('utf-8')
