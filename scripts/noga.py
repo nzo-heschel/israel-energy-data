@@ -25,6 +25,9 @@ def smp(start_date, end_date):
     response = requests.get(noga_url.format(start_date, end_date))
     # response = urlopen(noga_url.format(start_date, end_date))
     logging.info("Received noga/smp data with status code %s", response.status_code)
+    if response.status_code >= 400:
+        logging.warning("Error:", response.reason)
+        return {"error": response.reason}
     # Convert bytes to string type and string type to dict
     string = response.content.decode('utf-8')
     json_list = json.loads(string)
@@ -36,5 +39,5 @@ def smp(start_date, end_date):
         total_unconstrained_smp[date] = total_unconstrained_smp.get(date, 0) + json_obj["UnconstrainedSmp"] * 0.5
     return {SMP_CONST: total_constrained_smp, SMP_UNCONST: total_unconstrained_smp}
 
-http_debug_level(5)
+http_debug_level(0)
 # print(smp("01/01/2020", "04/05/2022"))
