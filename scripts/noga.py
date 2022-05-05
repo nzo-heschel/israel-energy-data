@@ -36,5 +36,5 @@ def smp(start_date, end_date):
         total_unconstrained_smp[date] = total_unconstrained_smp.get(date, 0) + json_obj["UnconstrainedSmp"] * 0.5
     return {SMP_CONST: total_constrained_smp, SMP_UNCONST: total_unconstrained_smp}
 
-# http_debug_level(0)
+http_debug_level(5)
 # print(smp("01/01/2020", "04/05/2022"))
