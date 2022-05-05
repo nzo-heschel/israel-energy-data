@@ -7,13 +7,17 @@ from dateutil.relativedelta import relativedelta
 
 from scripts import noga
 
-PORT = int(os.environ.get("PORT", 5000))
+PORT = int(os.environ.get("PORT", 9999))
 SMP_DATE_FORMAT = "%d-%m-%Y"
 
 
 @route('/')
 def hello():
-    return "Hello World"
+    return "<p>Use /smp to get last 3 months data" \
+           "<br>Use /smp/&lt;from date&gt;/&lt;to date&gt; for date range where date format is DD-MM-YYYY" \
+           "</p>"
+    # return "Use /smp to get last 3 months data\n" \
+    #        "Use /smp/<from>/<to> for date range where date format is DD-MM-YYYY"
 
 
 @route('/smp')
