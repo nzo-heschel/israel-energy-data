@@ -22,11 +22,9 @@ def http_debug_level(level):
 def smp(start_date, end_date):
     logging.info("Request noga/smp data from %s to %s", start_date, end_date)
     logging.info(noga_url.format(start_date, end_date))
-    session = requests.Session()
-    session.trust_env = False
-    response = session.get(noga_url.format(start_date, end_date))
+    response = requests.get(noga_url.format(start_date, end_date))
     # response = urlopen(noga_url.format(start_date, end_date))
-    logging.info("Received noga/smp data received")
+    logging.info("Received noga/smp data with status code %s", response.status_code)
     # Convert bytes to string type and string type to dict
     string = response.content.decode('utf-8')
     json_list = json.loads(string)
