@@ -5,7 +5,7 @@ import os
 from bottle import route, run
 from dateutil.relativedelta import relativedelta
 
-from scripts import noga
+import noga
 
 PORT = int(os.environ.get("PORT", 5000))
 SMP_DATE_FORMAT = "%d-%m-%Y"
