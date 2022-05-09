@@ -10,6 +10,9 @@ SMP_UNCONST = "unconstrained"
 FORMAT = '%(asctime)s  %(message)s'
 logging.basicConfig(format=FORMAT, level=logging.INFO)
 
+proxies = {
+    'https': 'p.webshare.io:9999',
+}
 
 def http_debug_level(level):
     http.client.HTTPConnection.debuglevel = level
@@ -22,7 +25,7 @@ def http_debug_level(level):
 def smp(start_date, end_date):
     logging.info("Request noga/smp data from %s to %s", start_date, end_date)
     logging.info(noga_url.format(start_date, end_date))
-    response = requests.get(noga_url.format(start_date, end_date))
+    response = requests.get(noga_url.format(start_date, end_date), proxies=proxies)
     # response = urlopen(noga_url.format(start_date, end_date))
     logging.info("Received noga/smp data with status code %s", response.status_code)
     if response.status_code >= 400:
@@ -39,5 +42,5 @@ def smp(start_date, end_date):
         total_unconstrained_smp[date] = total_unconstrained_smp.get(date, 0) + json_obj["UnconstrainedSmp"] * 0.5
     return {SMP_CONST: total_constrained_smp, SMP_UNCONST: total_unconstrained_smp}
 
-http_debug_level(0)
-# print(smp("01/01/2020", "04/05/2022"))
+http_debug_level(5)
+print(smp("01/01/2020", "04/05/2022"))
