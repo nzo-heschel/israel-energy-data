@@ -16,25 +16,36 @@ def hello():
     return "<p>Use /smp to get last 3 months data" \
            "<br>Use /smp/&lt;from date&gt;/&lt;to date&gt; for date range where date format is DD-MM-YYYY" \
            "</p>"
-    # return "Use /smp to get last 3 months data\n" \
-    #        "Use /smp/<from>/<to> for date range where date format is DD-MM-YYYY"
 
 
-@route('/smp')
-def smp_default():
+def default_dates():
     today = datetime.date.today()
     start_time = today + relativedelta(months=-1)
     end = today.strftime(SMP_DATE_FORMAT)
     start = start_time.strftime(SMP_DATE_FORMAT)
+    return start, end
+
+
+@route('/smp')
+def smp_default():
+    start, end = default_dates()
     return smp(start, end)
 
 
 @route('/smp/<date1>/<date2>')
 def smp(date1, date2):
-    date1 = date1.replace("-", "/")
-    date2 = date2.replace("-", "/")
-    smp_data = noga.smp(date1, date2)
-    return smp_data
+    return noga.smp(date1, date2)
+
+
+@route('/cost')
+def smp_default():
+    start, end = default_dates()
+    return cost(start, end)
+
+
+@route('/cost/<date1>/<date2>')
+def cost(date1, date2):
+    return noga.cost(date1, date2)
 
 
 if __name__ == "__main__":
