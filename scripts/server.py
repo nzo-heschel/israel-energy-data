@@ -40,7 +40,7 @@ def smp(date1, date2):
 
 
 @route('/cost')
-def smp_default():
+def cost_default():
     start, end = default_dates()
     return cost(start, end)
 
