@@ -61,9 +61,9 @@ def cost(start_date, end_date):
     for json_obj in cost_json_list:
         date = json_obj["Date"]
         average_cost[date] = average_cost.get(date, 0) + json_obj["Cost"] / 48
-        total_renewable_gen[date] = total_renewable_gen.get(date, 0) + json_obj["RenewableGen"] / 1000
-        total_conventional_gen[date] = total_conventional_gen.get(date, 0) + json_obj["ConventionalGen"] / 1000
-        total_system_demand[date] = total_system_demand.get(date, 0) + json_obj["SystemDemand"] / 1000
+        total_renewable_gen[date] = total_renewable_gen.get(date, 0) + json_obj["RenewableGen"] * 0.5
+        total_conventional_gen[date] = total_conventional_gen.get(date, 0) + json_obj["ConventionalGen"] * 0.5
+        total_system_demand[date] = total_system_demand.get(date, 0) + json_obj["SystemDemand"] * 0.5
     return {COST_AVERAGE: average_cost,
             COST_REN: total_renewable_gen,
             COST_CONV: total_conventional_gen,
