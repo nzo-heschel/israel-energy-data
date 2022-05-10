@@ -2,6 +2,7 @@ import json
 import logging
 import requests
 import http.client
+import os
 
 noga_url = 'https://www.noga-iso.co.il/Umbraco/Api/Documents/GetCosts/?startDateString={}&endDateString={}&culture=he-IL&dataType=SMP'
 SMP_CONST = "constrained"
@@ -11,7 +12,7 @@ FORMAT = '%(asctime)s  %(message)s'
 logging.basicConfig(format=FORMAT, level=logging.INFO)
 
 proxies = {
-    'https': 'p.webshare.io:9999',
+    'https': os.environ.get('PROXY_SERVER'),
 }
 
 def http_debug_level(level):
