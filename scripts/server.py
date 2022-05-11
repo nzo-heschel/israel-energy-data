@@ -50,6 +50,28 @@ def cost(date1, date2):
     return noga.cost(date1, date2)
 
 
+@route('/forecast-1')
+def forecast1_default():
+    start, end = default_dates()
+    return forecast1(start, end)
+
+
+@route('/forecast-1/<date1>/<date2>')
+def forecast1(date1, date2):
+    return noga.forecast1(date1, date2)
+
+
+@route('/forecast-2')
+def forecast2_default():
+    start, end = default_dates()
+    return forecast2(start, end)
+
+
+@route('/forecast-2/<date1>/<date2>')
+def forecast2(date1, date2):
+    return noga.forecast2(date1, date2)
+
+
 if __name__ == "__main__":
     FORMAT = '%(asctime)s  %(message)s'
     logging.basicConfig(format=FORMAT, level=logging.INFO)

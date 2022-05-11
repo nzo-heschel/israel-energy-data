@@ -5,13 +5,16 @@ import http.client
 import os
 
 noga_url = 'https://www.noga-iso.co.il/Umbraco/Api/Documents/GetCosts/?startDateString={}&endDateString={}&culture=he-IL&dataType={}'
-SMP_CONST = "constrained"
-SMP_UNCONST = "unconstrained"
+SMP_CONST = "ConstrainedSmp"
+SMP_UNCONST = "UnconstrainedSmp"
 
 COST_AVERAGE = "AverageCost"
-COST_REN = "Renewable"
-COST_CONV = "Conventional"
-COST_DEMAND = "Demand"
+COST_REN = "RenewableGen"
+COST_CONV = "ConventionalGen"
+COST_DEMAND = "SystemDemand"
+
+FORECAST_REN = "ForecastRenewableGen"
+FORECAST_DEMAND = "ForecastSystemDemand"
 
 FORMAT = '%(asctime)s  %(message)s'
 logging.basicConfig(format=FORMAT, level=logging.INFO)
@@ -68,6 +71,31 @@ def cost(start_date, end_date):
             COST_REN: total_renewable_gen,
             COST_CONV: total_conventional_gen,
             COST_DEMAND: total_system_demand}
+
+
+def forecast1(start_date, end_date):
+    forecast_json_list = request('forecast1', start_date, end_date)
+    if is_error(forecast_json_list):
+        return forecast_json_list
+    return forecast_json(forecast_json_list)
+
+
+def forecast2(start_date, end_date):
+    forecast_json_list = request('forecast2', start_date, end_date)
+    if is_error(forecast_json_list):
+        return forecast_json_list
+    return forecast_json(forecast_json_list)
+
+
+def forecast_json(json_list):
+    total_renewable = {}
+    total_system_demand = {}
+    for json_obj in json_list:
+        date = json_obj["Date"]
+        total_renewable[date] = total_renewable.get(date, 0) + json_obj["Renewable"] * 0.5
+        total_system_demand[date] = total_system_demand.get(date, 0) + json_obj["SystemDemand"] * 0.5
+    return {FORECAST_REN: total_renewable,
+            FORECAST_DEMAND: total_system_demand}
 
 
 def request(noga_type, start_date, end_date):
