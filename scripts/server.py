@@ -10,10 +10,9 @@ import noga
 PORT = int(os.environ.get("PORT", 9999))
 SMP_DATE_FORMAT = "%d-%m-%Y"
 
-
 @route('/')
 def hello():
-    return static_file(filename="index.html", root="../resources")
+    return static_file(filename="index.html", root=os.environ['PYTHONPATH'] + "/" + "resources")
 
 
 def default_dates():
