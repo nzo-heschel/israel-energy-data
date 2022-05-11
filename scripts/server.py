@@ -2,7 +2,7 @@ import datetime
 import logging
 import os
 
-from bottle import route, run
+from bottle import route, run, static_file
 from dateutil.relativedelta import relativedelta
 
 import noga
@@ -13,11 +13,7 @@ SMP_DATE_FORMAT = "%d-%m-%Y"
 
 @route('/')
 def hello():
-    return '<p>Use <a href="/smp">/smp</a> to get last 3 months SMP data' \
-           '<br>Use /smp/&lt;from date&gt;/&lt;to date&gt; for date range where date format is DD-MM-YYYY' \
-           '<br>Use <a href="/cost">/cost</a> to get last 3 months Cost data' \
-           '<br>Use /cost/&lt;from date&gt;/&lt;to date&gt; for date range where date format is DD-MM-YYYY' \
-           '</p>'
+    return static_file(filename="index.html", root="../resources")
 
 
 def default_dates():
