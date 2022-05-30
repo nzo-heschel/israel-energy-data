@@ -4,7 +4,7 @@ class Storage:
         pass
 
     def bulk_insert(self, namespace, values):
-        """Insert a sequence of values. Each value has a date, time, tag and value"""
+        """Insert a sequence of values. Each value is a list with date, time, tag and value."""
         pass
 
     def retrieve(self, namespace, date, time=None, tag=None):
@@ -85,3 +85,25 @@ class InMemCache(Storage):
 
     def __str__(self):
         return str(self._in_mem_cache)
+
+# c = InMemCache()
+# c.insert("a.b.c", "01-02-2022", "10:00", "T-1", 1.0)
+# c.insert("a.b.c", "01-02-2022", "10:00", "T-2", 2.0)
+# c.insert("a.b.c", "01-02-2022", "10:30", "T-1", 3.0)
+# c.insert("a.b.c", "01-02-2022", "10:30", "T-2", 4.0)
+# c.insert("a.b.c", "01-02-2022", "11:00", "T-1", 5.0)
+# c.insert("a.b.c", "01-02-2022", "13:10", "T-2", 6.0)
+# c.insert("a.b.c", "01-02-2022", "13:25", "T-2", 7.0)
+#
+# c.insert("a.b.c", "02-02-2022", "03:30", "T-1", 8.0)
+# c.insert("a.b.c", "02-02-2022", "03:40", "T-2", 9.0)
+# c.insert("a.b.c", "02-02-2022", "03:50", "T-2", 10.0)
+# c.insert("a.b.c", "02-02-2022", "06:40", "T-2", 11.0)
+# print(c)
+# print(c.retrieve(namespace="a.b.c", date="01-02-2022", tag="T-2", time="10:00"))
+# print(c.retrieve(namespace="a.b.c", date="01-02-2022", tag="T-2", time="all"))
+# print(c.retrieve(namespace="a.b.c", date="01-02-2022", tag="T-2", time="hour"))
+# print(c.retrieve(namespace="a.b.c", date="01-02-2022", tag="T-2", time="day"))
+# print(c.retrieve(namespace="a.b.c", date="02-02-2022", time="hour"))
+# print(c.retrieve(namespace="a.b.c", date="02-02-2022", time="day"))
+
