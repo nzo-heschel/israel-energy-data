@@ -12,7 +12,7 @@ SQL_RETRIEVE = "SELECT * FROM main_table " \
                "WHERE namespace IS '{namespace}'"
 
 SQL_AND_DATE = " AND date IS date('{date}')"
-SQL_AND_DATE_RANGE = "AND date BETWEEN date('{from_date}') AND date('{to_date}')"
+SQL_AND_DATE_RANGE = " AND date BETWEEN date('{from_date}') AND date('{to_date}')"
 SQL_AND_TIME = " AND time is time('{time}')"
 SQL_AND_TAG = " AND tag is '{tag}'"
 
@@ -67,10 +67,10 @@ class InMemSqlStorage(Storage):
         else:
             sql_and_date = SQL_AND_DATE_RANGE.format(from_date=date_from, to_date=date_to)
         if time == "day":
-            query = (SQL_SUM + sql_and_date + SQL_GROUP_BY_DATE + (SQL_AND_TAG if tag else "")) \
+            query = (SQL_SUM + sql_and_date + (SQL_AND_TAG if tag else "") + SQL_GROUP_BY_DATE) \
                 .format(namespace=namespace, tag=tag)
         elif time == "hour":
-            query = (SQL_SUM + sql_and_date + SQL_GROUP_BY_HOUR + (SQL_AND_TAG if tag else "")) \
+            query = (SQL_SUM + sql_and_date + (SQL_AND_TAG if tag else "") + SQL_GROUP_BY_HOUR) \
                 .format(namespace=namespace, tag=tag)
         else:
             query = (SQL_RETRIEVE + sql_and_date +
