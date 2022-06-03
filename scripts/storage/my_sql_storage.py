@@ -1,30 +1,36 @@
-from storage import Storage, fix_date, unfix_date
-import sqlite3
+import mysql.connector
+
+from storage import Storage, fix_date, unfix_date, unfix_time
 
 SQL_CREATE_TABLE = "CREATE TABLE IF NOT EXISTS main_table " \
                    "(namespace VARCHAR(80), date DATE, time TIME, tag VARCHAR(20), value REAL, " \
                    "CONSTRAINT main_table_pk PRIMARY KEY (namespace, date, time, tag))"
 
 SQL_INSERT = "INSERT INTO main_table VALUES "
-SQL_ON_CONFLICT = " ON CONFLICT(namespace, date, time, tag) DO UPDATE SET value=excluded.value"
+SQL_ON_CONFLICT = "as new_value ON DUPLICATE KEY UPDATE value=new_value.value"
 
 SQL_RETRIEVE = "SELECT * FROM main_table " \
-               "WHERE namespace IS '{namespace}'"
+               "WHERE namespace = '{namespace}'"
 
-SQL_AND_DATE = " AND date IS date('{date}')"
+SQL_AND_DATE = " AND date = date('{date}')"
 SQL_AND_DATE_RANGE = " AND date BETWEEN date('{from_date}') AND date('{to_date}')"
-SQL_AND_TIME = " AND time is time('{time}')"
-SQL_AND_TAG = " AND tag is '{tag}'"
+SQL_AND_TIME = " AND time = time('{time}')"
+SQL_AND_TAG = " AND tag = '{tag}'"
 
-SQL_SUM = "SELECT namespace, date, time, tag, SUM(value) from main_table " \
-          "WHERE namespace IS '{namespace}' "
+SQL_SUM = "SELECT namespace, date, hour(time), tag, SUM(value) from main_table " \
+          "WHERE namespace = '{namespace}' "
+SQL_SUM_DAY = "SELECT namespace, date, time('00:00'), tag, SUM(value) from main_table " \
+          "WHERE namespace = '{namespace}' "
 SQL_GROUP_BY_DATE = " GROUP BY date, tag"
-SQL_GROUP_BY_HOUR = " GROUP BY date, strftime('%H', time), tag"
+SQL_GROUP_BY_HOUR = " GROUP BY date, hour(time), tag"
 
 
-class InMemSqlStorage(Storage):
-    def __init__(self, name="energy-data"):
-        self.db = sqlite3.connect(name)
+class MySqlStorage(Storage):
+    def __init__(self, name="energy_data"):
+        self.db = mysql.connector.connect(host='localhost', user='root', password='mysql_root_123')
+        curr = self.db.cursor()
+        curr.execute("CREATE DATABASE IF NOT EXISTS " + name)
+        self.db = mysql.connector.connect(host='localhost', database=name, user='root', password='mysql_root_123')
         curr = self.db.cursor()
         curr.execute(SQL_CREATE_TABLE)
         curr.close()
@@ -36,9 +42,12 @@ class InMemSqlStorage(Storage):
         curr.close()
 
     def retrieve_value(self, namespace, date, time, tag):
-        c = self.db.execute((SQL_RETRIEVE+SQL_AND_DATE+SQL_AND_TAG+SQL_AND_TIME)
-                            .format(namespace=namespace, date=fix_date(date), time=time, tag=tag))
-        records = c.fetchall()
+        curr = self.db.cursor()
+        query = (SQL_RETRIEVE+SQL_AND_DATE+SQL_AND_TIME+SQL_AND_TAG)\
+            .format(namespace=namespace, date=fix_date(date), time=time, tag=tag)
+        curr.execute(query)
+        records = curr.fetchall()
+        curr.close()
         return records[0][-1] if records else None
 
     def insert(self, namespace, date, time, tag, value):
@@ -67,7 +76,7 @@ class InMemSqlStorage(Storage):
         else:
             sql_and_date = SQL_AND_DATE_RANGE.format(from_date=date_from, to_date=date_to)
         if time == "day":
-            query = (SQL_SUM + sql_and_date + (SQL_AND_TAG if tag else "") + SQL_GROUP_BY_DATE) \
+            query = (SQL_SUM_DAY + sql_and_date + (SQL_AND_TAG if tag else "") + SQL_GROUP_BY_DATE) \
                 .format(namespace=namespace, tag=tag)
         elif time == "hour":
             query = (SQL_SUM + sql_and_date + (SQL_AND_TAG if tag else "") + SQL_GROUP_BY_HOUR) \
@@ -77,8 +86,10 @@ class InMemSqlStorage(Storage):
                      (SQL_AND_TIME if time != "all" else "") +
                      (SQL_AND_TAG if tag else "")) \
                 .format(namespace=namespace, time=time, tag=tag)
-        c = self.db.execute(query)
-        records = c.fetchall()
+        curr = self.db.cursor()
+        curr.execute(query)
+        records = curr.fetchall()
+        curr.close()
         return self._records_to_dict(records)
 
     def _records_to_dict(self, records):
@@ -86,7 +97,7 @@ class InMemSqlStorage(Storage):
         for record in records:
             (namespace, date, time, tag, value) = record
             date = unfix_date(date)
-            time = time[0:5]  # remove seconds
+            time = unfix_time(time)  # remove seconds
             ns = self._dkv(d, namespace)
             dt = self._dkv(ns, date)
             tm = self._dkv(dt, time)

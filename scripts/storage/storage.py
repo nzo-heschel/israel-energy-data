@@ -38,4 +38,10 @@ def fix_date(date):
 
 
 def unfix_date(date):
-    return date[8:10] + "-" + date[5:7] + "-" + date[0:4] if date[4] == "-" else date
+    str_date = str(date)
+    return str_date[8:10] + "-" + str_date[5:7] + "-" + str_date[0:4] if str_date[4] == "-" else str_date
+
+def unfix_time(time):
+    str_time = str(time) + ":00" # if time is just a number
+    return "0" + str_time[0:4] if str_time[2] != ":" else str_time[0:5]
+
