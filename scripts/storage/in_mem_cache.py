@@ -1,4 +1,4 @@
-from storage import Storage, fix_date, dict_key_value
+from storage import Storage, fix_date, unfix_date, dict_key_value
 
 
 class InMemCache(Storage):
@@ -25,7 +25,7 @@ class InMemCache(Storage):
         if time not in ["all", "day", "hour"] and tag:  # single value
             value = self.retrieve_value(namespace, date, time, tag)
             return {namespace: {date: {time: {tag: value}}}}
-        values = self._in_mem_cache.get(namespace, {}).get(date, {})
+        values = self._in_mem_cache.get(namespace, {}).get(fix_date(date), {})
         if time not in ["all", "day", "hour"]:
             values = {time: values.get(time)}
         day_result = {}
@@ -50,7 +50,7 @@ class InMemCache(Storage):
     def retrieve_value(self, namespace, date, time, tag):
         return self._in_mem_cache \
             .get(namespace, {}) \
-            .get(date, {}) \
+            .get(fix_date(date), {}) \
             .get(time, {}) \
             .get(tag, None)
 
@@ -59,7 +59,8 @@ class InMemCache(Storage):
         proper_date_from = fix_date(from_date)
         proper_date_to = fix_date(to_date)
         dates = [date for date in values.keys() if proper_date_from <= fix_date(date) <= proper_date_to]
-        return_values = {date: self.retrieve(namespace, date, time, tag).get(namespace).get(date) for date in dates}
+        return_values = {unfix_date(date): self.retrieve(namespace, date, time, tag).get(namespace).get(date)
+                         for date in dates}
         return {namespace: return_values}
 
     def as_dictionary(self):
