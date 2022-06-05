@@ -1,4 +1,5 @@
 class Storage:
+
     def clear(self):
         pass
 
@@ -33,6 +34,12 @@ class Storage:
         pass
 
 
+def dict_key_value(d, key):
+    if not d.get(key):
+        d[key] = {}
+    return d.get(key)
+
+
 def fix_date(date):
     return date[6:10] + "-" + date[3:5] + "-" + date[0:2] if date[2] == "-" else date
 
@@ -41,7 +48,7 @@ def unfix_date(date):
     str_date = str(date)
     return str_date[8:10] + "-" + str_date[5:7] + "-" + str_date[0:4] if str_date[4] == "-" else str_date
 
-def unfix_time(time):
-    str_time = str(time) + ":00" # if time is just a number
-    return "0" + str_time[0:4] if str_time[2] != ":" else str_time[0:5]
 
+def unfix_time(time):
+    str_time = str(time) + ":00"  # if time is just a number
+    return "0" + str_time[0:4] if str_time[2] != ":" else str_time[0:5]

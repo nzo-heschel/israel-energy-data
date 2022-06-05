@@ -1,4 +1,4 @@
-from storage import Storage, fix_date
+from storage import Storage, fix_date, dict_key_value
 
 
 class InMemCache(Storage):
@@ -12,15 +12,9 @@ class InMemCache(Storage):
         self.insert(val[0], val[1], val[2], val[3], val[4])
 
     def insert(self, namespace, date, time, tag, value):
-        if namespace not in self._in_mem_cache:
-            self._in_mem_cache[namespace] = {}
-        per_namespace = self._in_mem_cache.get(namespace)
-        if date not in per_namespace:
-            per_namespace[date] = {}
-        per_date = per_namespace.get(date)
-        if time not in per_date:
-            per_date[time] = {}
-        per_time = per_date.get(time)
+        per_namespace = dict_key_value(self._in_mem_cache, namespace)
+        per_date = dict_key_value(per_namespace, date)
+        per_time = dict_key_value(per_date, time)
         per_time[tag] = value
 
     def bulk_insert(self, values):
