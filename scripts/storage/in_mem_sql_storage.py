@@ -1,4 +1,4 @@
-from storage import Storage, fix_date, unfix_date
+from storage import Storage, fix_date, unfix_date, unfix_time, dict_key_value
 import sqlite3
 
 SQL_CREATE_TABLE = "CREATE TABLE IF NOT EXISTS main_table " \
@@ -86,17 +86,12 @@ class InMemSqlStorage(Storage):
         for record in records:
             (namespace, date, time, tag, value) = record
             date = unfix_date(date)
-            time = time[0:5]  # remove seconds
-            ns = self._dkv(d, namespace)
-            dt = self._dkv(ns, date)
-            tm = self._dkv(dt, time)
+            time = unfix_time(time)  # remove seconds
+            ns = dict_key_value(d, namespace)
+            dt = dict_key_value(ns, date)
+            tm = dict_key_value(dt, time)
             tm[tag] = value
         return d
-
-    def _dkv(self, d, key):
-        if not d.get(key):
-            d[key] = {}
-        return d.get(key)
 
     def _fix(self, value):
         return "('{}', date('{}'), time('{}'), '{}', {})".format(*value)
