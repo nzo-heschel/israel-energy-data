@@ -1,5 +1,6 @@
 from sql_storage import SqlStorageTemplate
 import mysql.connector
+from furl import furl
 
 
 class MySqlStorage(SqlStorageTemplate):
@@ -15,8 +16,19 @@ class MySqlStorage(SqlStorageTemplate):
     SQL_GROUP_BY_DATE = " GROUP BY date, tag"
     SQL_GROUP_BY_HOUR = " GROUP BY date, hour(time), tag"
 
-    def __init__(self, name="energy_data"):
-        self.db = mysql.connector.connect(host='localhost', user='root', password='mysql_root_123')
-        self._execute_query("CREATE DATABASE IF NOT EXISTS " + name)
-        self.db = mysql.connector.connect(host='localhost', database=name, user='root', password='mysql_root_123')
+    def __init__(self, uri):
+        self.url = furl(uri)
+        self.db = self._init_connection()
+        self._execute_query("CREATE DATABASE IF NOT EXISTS main_table")
+        self.db = self._init_connection(database="main_table")
         self._execute_query(self.SQL_CREATE_TABLE)
+
+    def _init_connection(self, database=None):
+        user = self.url.username
+        password = self.url.password
+        host = self.url.host
+        port = self.url.port or 3306
+        if database:
+            return mysql.connector.connect(host=host, user=user, password=password, port=port, database=database)
+        else:
+            return mysql.connector.connect(host=host, user=user, password=password, port=port)

@@ -1,3 +1,4 @@
+from furl import furl
 from sql_storage import SqlStorageTemplate
 import sqlite3
 
@@ -14,6 +15,8 @@ class InMemSqlStorage(SqlStorageTemplate):
     SQL_GROUP_BY_DATE = " GROUP BY date, tag"
     SQL_GROUP_BY_HOUR = " GROUP BY date, strftime('%H', time), tag"
 
-    def __init__(self, name="energy-data"):
-        self.db = sqlite3.connect(name)
+    def __init__(self, uri="sqlite://energy-data"):
+        self.url = furl(uri)
+        file_name = str(self.url.host)
+        self.db = sqlite3.connect(file_name)
         self._execute_query(self.SQL_CREATE_TABLE)
