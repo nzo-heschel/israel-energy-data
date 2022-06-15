@@ -1,6 +1,5 @@
 import unittest
-
-from scripts.storage.in_mem_cache import InMemCache
+from scripts.storage import storage_util as storage
 
 NAMESPACE = "a.b.c"
 DATE_1_2_22 = "01-02-2022"
@@ -11,6 +10,7 @@ TAG_2 = "T-2"
 
 class TestStorage(unittest.TestCase):
     def populate(self):
+        self.store.clear()
         self.store.insert(NAMESPACE, DATE_1_2_22, "10:00", TAG_1, 1.0)
         self.store.insert(NAMESPACE, DATE_1_2_22, "10:00", TAG_2, 2.0)
         self.store.insert(NAMESPACE, DATE_1_2_22, "10:30", TAG_1, 3.0)
@@ -24,15 +24,17 @@ class TestStorage(unittest.TestCase):
         self.store.insert(NAMESPACE, DATE_2_2_22, "06:40", TAG_2, 11.0)
 
     def setUp(self):
-        self.store = InMemCache()
+        self.store = storage.new_instance("sqlite://test_file")
+        # self.store = storage.new_instance("cache")
+        # self.store = storage.new_instance("mysql://root:mysql_root_123@localhost:3306")
+        # self.store = storage.new_instance("postgres://postgres:postgrespw@localhost:55000")
         self.populate()
 
     def test_clear(self):
-        c = InMemCache()
+        c = storage.new_instance("sqlite://my_file_clear")
         c.insert(NAMESPACE, DATE_1_2_22, TAG_1, "10:00", 10)
-        self.assertEqual(1, len(c.as_dictionary()))
         c.clear()
-        self.assertFalse(c.as_dictionary())
+        self.assertEqual(0, c.size())
 
     def test_simple_retrieve(self):
         val = self.store.retrieve(namespace=NAMESPACE, date=DATE_1_2_22, tag=TAG_1, time="10:00")
@@ -42,12 +44,13 @@ class TestStorage(unittest.TestCase):
     def test_retrieve_all(self):
         value_all = self.store.retrieve(namespace=NAMESPACE, date=DATE_1_2_22, tag=TAG_2, time="all")
         keys_all = value_all[NAMESPACE][DATE_1_2_22].keys()
-        self.assertTrue(all(key in keys_all for key in ('10:00', '10:30', '11:00', '13:10', '13:25')))
+        for key in keys_all:
+            self.assertTrue(key in ('10:00', '10:30', '11:00', '13:10', '13:25'))
 
     '''Verify that time="hour" with a tag works properly'''
     def test_retrieve_hour_with_tag(self):
         value_hour_tag = self.store.retrieve(namespace=NAMESPACE, date=DATE_1_2_22, tag=TAG_2, time="hour")
-        self.assertEqual(3, len(value_hour_tag[NAMESPACE][DATE_1_2_22]))
+        self.assertEqual(2, len(value_hour_tag[NAMESPACE][DATE_1_2_22]))
         unique_tags = set(flatten([d.keys() for d in value_hour_tag[NAMESPACE][DATE_1_2_22].values()]))
         self.assertEqual(1, len(unique_tags))
         self.assertTrue(TAG_2 in unique_tags)
@@ -69,11 +72,14 @@ class TestStorage(unittest.TestCase):
 
     '''Verify that when inserting twice with the same arguments, the last one wins'''
     def test_upsert(self):
-        c = InMemCache()
+        c = storage.new_instance("sqlite://test_upsert")
         c.insert(NAMESPACE, DATE_1_2_22, "11:11", TAG_1, 5.0)
         c.insert(NAMESPACE, DATE_1_2_22, "11:11", TAG_1, 6.0)
         v = c.retrieve_value(namespace=NAMESPACE, date=DATE_1_2_22, tag=TAG_1, time="11:11")
         self.assertEqual(6.0, v)
+
+    def test_size(self):
+        self.assertEqual(11, self.store.size())
 
 
 def flatten(lists):
