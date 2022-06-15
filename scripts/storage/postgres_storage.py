@@ -1,5 +1,5 @@
-from sql_storage import SqlStorageTemplate
-from storage_top import fix_date
+from scripts.storage.sql_storage import SqlStorageTemplate
+from scripts.storage.storage_top import fix_date
 import psycopg2
 from furl import furl
 
@@ -10,8 +10,8 @@ class PostgresStorage(SqlStorageTemplate):
     SQL_AND_DATE = " AND date = '{date}'"
     SQL_AND_DATE_RANGE = " AND date BETWEEN '{from_date}' AND '{to_date}'"
     SQL_AND_TIME = " AND time = '{time}'"
-    SQL_SUM = "SELECT namespace, date, to_char(time, 'HH24') as hour, tag, SUM(value) from main_table " \
-              "WHERE namespace = '{namespace}' "
+    SQL_SUM_HOUR = "SELECT namespace, date, to_char(time, 'HH24') as hour, tag, SUM(value) from main_table " \
+                   "WHERE namespace = '{namespace}' "
     SQL_SUM_DAY = "SELECT namespace, date, '00:00', tag, SUM(value) from main_table " \
                   "WHERE namespace = '{namespace}' "
     SQL_GROUP_BY_DATE = " GROUP BY namespace, date, tag"

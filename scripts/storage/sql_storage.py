@@ -1,4 +1,4 @@
-from storage_top import Storage, fix_date, unfix_date, unfix_time, dict_key_value
+from scripts.storage.storage_top import Storage, fix_date, unfix_date, unfix_time, dict_key_value
 
 
 class SqlStorageTemplate(Storage):
@@ -18,10 +18,12 @@ class SqlStorageTemplate(Storage):
     SQL_AND_TIME = None
     SQL_AND_TAG = " AND tag = '{tag}'"
 
-    SQL_SUM = None
+    SQL_SUM_HOUR = None
     SQL_SUM_DAY = None
     SQL_GROUP_BY_DATE = None
     SQL_GROUP_BY_HOUR = None
+
+    SQL_SIZE = "SELECT count(*) from main_table"
 
     def clear(self):
         self._execute_query("DROP TABLE main_table",
@@ -62,6 +64,10 @@ class SqlStorageTemplate(Storage):
     def retrieve_range(self, namespace, from_date, to_date, tag=None, time="day"):
         return self._retrieve(namespace, date_from=fix_date(from_date), date_to=fix_date(to_date), tag=tag, time=time)
 
+    def size(self):
+        records = self._get_records(self.SQL_SIZE)
+        return records[0][0]
+
     def _retrieve(self, namespace, date=None, date_from=None, date_to=None, tag=None, time="all"):
         if date and tag and time not in ["all", "day", "hour"]:
             date = fix_date(date)
@@ -75,7 +81,7 @@ class SqlStorageTemplate(Storage):
             query = (self.SQL_SUM_DAY + sql_and_date + (self.SQL_AND_TAG if tag else "") + self.SQL_GROUP_BY_DATE) \
                 .format(namespace=namespace, tag=tag)
         elif time == "hour":
-            query = (self.SQL_SUM + sql_and_date + (self.SQL_AND_TAG if tag else "") + self.SQL_GROUP_BY_HOUR) \
+            query = (self.SQL_SUM_HOUR + sql_and_date + (self.SQL_AND_TAG if tag else "") + self.SQL_GROUP_BY_HOUR) \
                 .format(namespace=namespace, tag=tag)
         else:
             query = (self.SQL_RETRIEVE + sql_and_date +

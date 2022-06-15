@@ -30,6 +30,9 @@ class Storage:
         """Retrieve values for the given range of dates."""
         pass
 
+    def size(self):
+        pass
+
     def print(self):
         pass
 
