@@ -13,4 +13,4 @@ def new_instance(uri):
         return cache.InMemCache()
     elif uri.startswith("sqlite"):
         return sqlite.InMemSqlStorage(uri)
-    raise ValueError("Wrong type of storage")
+    raise ValueError("Wrong type of storage:", uri)
