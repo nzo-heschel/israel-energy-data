@@ -13,6 +13,8 @@ class SqlStorageTemplate(Storage):
     SQL_RETRIEVE = "SELECT * FROM main_table " \
                    "WHERE namespace = '{namespace}'"
 
+    SQL_LATEST_DATE = "SELECT max(date) from main_table WHERE namespace = '{namespace}'"
+
     SQL_AND_DATE = None
     SQL_AND_DATE_RANGE = None
     SQL_AND_TIME = None
@@ -63,6 +65,10 @@ class SqlStorageTemplate(Storage):
 
     def retrieve_range(self, namespace, from_date, to_date, tag=None, time="day"):
         return self._retrieve(namespace, date_from=fix_date(from_date), date_to=fix_date(to_date), tag=tag, time=time)
+
+    def latest_date(self, namespace):
+        records = self._get_records(self.SQL_LATEST_DATE.format(namespace=namespace))
+        return unfix_date(records[0][0])
 
     def size(self):
         records = self._get_records(self.SQL_SIZE)

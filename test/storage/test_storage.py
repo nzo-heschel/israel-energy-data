@@ -72,6 +72,10 @@ class TestStorage(unittest.TestCase):
     def test_size(self):
         self.assertEqual(11, self.store.size())
 
+    def test_latest_date(self):
+        self.assertEqual(DATE_2_2_22, self.store.latest_date(NAMESPACE))
+        self.assertIsNone(self.store.latest_date("foo"))
+
 
 @parameterized_class("uri", PARAMS)
 class TestStorageNoPopulate(unittest.TestCase):
