@@ -29,5 +29,14 @@ class PostgresStorage(SqlStorageTemplate):
         port = self.url.port
         return psycopg2.connect(user=user, password=password, host=host, port=port)
 
+    def bulk_insert(self, values):
+        # in postgres we can't have duplicates in the same command.
+        if len(values) > 1:
+            values_dict = {}
+            for value in values:
+                values_dict[str(value[:-1])] = value
+            values = values_dict.values()
+        self._execute_query(self.SQL_INSERT + (",".join([self._fix(v) for v in values])) + self.SQL_ON_CONFLICT)
+
     def _fix(self, value):
         return "('{}', '{}', '{}', '{}', {})".format(value[0], fix_date(value[1]), value[2], value[3], value[4])

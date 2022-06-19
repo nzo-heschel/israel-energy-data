@@ -57,7 +57,6 @@ class SqlStorageTemplate(Storage):
         self.bulk_insert([(namespace, fix_date(date), time, tag, value)])
 
     def bulk_insert(self, values):
-        # TODO: fix date if reached here directly
         self._execute_query(self.SQL_INSERT + (",".join([self._fix(v) for v in values])) + self.SQL_ON_CONFLICT)
 
     def retrieve(self, namespace, date, tag=None, time="all"):
@@ -110,4 +109,5 @@ class SqlStorageTemplate(Storage):
         return d
 
     def _fix(self, value):
-        return "('{}', date('{}'), time('{}'), '{}', {})".format(*value)
+        return "('{}', date('{}'), time('{}'), '{}', {})"\
+            .format(value[0], fix_date(value[1]), value[2], value[3], value[4])

@@ -94,6 +94,12 @@ class TestStorageNoPopulate(unittest.TestCase):
         v = self.store.retrieve_value(namespace=NAMESPACE, date=DATE_1_2_22, tag=TAG_1, time="11:11")
         self.assertEqual(6.0, v)
 
+    def test_bulk_insert(self):
+        values = [[NAMESPACE, DATE_1_2_22, "11:11", TAG_1, 5.0], [NAMESPACE, DATE_1_2_22, "11:11", TAG_1, 6.0]]
+        self.store.bulk_insert(values)
+        v = self.store.retrieve_value(namespace=NAMESPACE, date=DATE_1_2_22, tag=TAG_1, time="11:11")
+        self.assertEqual(6.0, v)
+
 
 class TestStorageNonParametrized(unittest.TestCase):
     def test_bad_uri(self):
