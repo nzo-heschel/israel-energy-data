@@ -72,6 +72,10 @@ class TestStorage(unittest.TestCase):
     def test_size(self):
         self.assertEqual(11, self.store.size())
 
+    def test_latest_date(self):
+        self.assertEqual(DATE_2_2_22, self.store.latest_date(NAMESPACE))
+        self.assertIsNone(self.store.latest_date("foo"))
+
 
 @parameterized_class("uri", PARAMS)
 class TestStorageNoPopulate(unittest.TestCase):
@@ -87,6 +91,12 @@ class TestStorageNoPopulate(unittest.TestCase):
     def test_upsert(self):
         self.store.insert(NAMESPACE, DATE_1_2_22, "11:11", TAG_1, 5.0)
         self.store.insert(NAMESPACE, DATE_1_2_22, "11:11", TAG_1, 6.0)
+        v = self.store.retrieve_value(namespace=NAMESPACE, date=DATE_1_2_22, tag=TAG_1, time="11:11")
+        self.assertEqual(6.0, v)
+
+    def test_bulk_insert(self):
+        values = [[NAMESPACE, DATE_1_2_22, "11:11", TAG_1, 5.0], [NAMESPACE, DATE_1_2_22, "11:11", TAG_1, 6.0]]
+        self.store.bulk_insert(values)
         v = self.store.retrieve_value(namespace=NAMESPACE, date=DATE_1_2_22, tag=TAG_1, time="11:11")
         self.assertEqual(6.0, v)
 

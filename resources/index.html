@@ -12,11 +12,10 @@
 </head>
 <body>
 <h1 dir="rtl" lang="he" align="center">ברוכים הבאים לאתר הנתונים של NZO</h1>
-<h2>Noga</h2>
-<p><a href="/smp">/smp</a> returns last 3 months SMP data</p>
-<p><a href="/cost">/cost</a> returns last 3 months Cost data</p>
-<p><a href="/forecast-1">/forecast-1</a> returns last 3 months forecast (day in advance) data</p>
-<p><a href="/forecast-2">/forecast-2</a> returns last 3 months forecast (update) data</p>
-<p>Add /DD-MM-YYYY/DD-MM-YYYY to specify time range</p>
+<h2>Noga sample URLs</h2>
+<p>Last month <a href="/get?source=noga&type=smp&time=hour">SMP</a> hourly data</p>
+<p>2021 <a href="/get?source=noga&type=cost&start_date=01-01-2021&end_date=31-12-2021&time=day">Cost</a> daily data</p>
+<p>December 2021 <a href="/get?source=noga&type=forecast1&start_date=01-12-2021&end_date=31-12-2021&time=all&tag=SystemDemand">Forecast-1</a> (day in advance) full (1/2 hr) system demand data</p>
+<p>Can also use type=forcast2 (update), time=all for all available samples</p>
 </body>
 </html>

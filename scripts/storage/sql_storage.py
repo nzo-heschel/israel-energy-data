@@ -13,6 +13,8 @@ class SqlStorageTemplate(Storage):
     SQL_RETRIEVE = "SELECT * FROM main_table " \
                    "WHERE namespace = '{namespace}'"
 
+    SQL_LATEST_DATE = "SELECT max(date) from main_table WHERE namespace = '{namespace}'"
+
     SQL_AND_DATE = None
     SQL_AND_DATE_RANGE = None
     SQL_AND_TIME = None
@@ -55,7 +57,6 @@ class SqlStorageTemplate(Storage):
         self.bulk_insert([(namespace, fix_date(date), time, tag, value)])
 
     def bulk_insert(self, values):
-        # TODO: fix date if reached here directly
         self._execute_query(self.SQL_INSERT + (",".join([self._fix(v) for v in values])) + self.SQL_ON_CONFLICT)
 
     def retrieve(self, namespace, date, tag=None, time="all"):
@@ -63,6 +64,10 @@ class SqlStorageTemplate(Storage):
 
     def retrieve_range(self, namespace, from_date, to_date, tag=None, time="day"):
         return self._retrieve(namespace, date_from=fix_date(from_date), date_to=fix_date(to_date), tag=tag, time=time)
+
+    def latest_date(self, namespace):
+        records = self._get_records(self.SQL_LATEST_DATE.format(namespace=namespace))
+        return unfix_date(records[0][0])
 
     def size(self):
         records = self._get_records(self.SQL_SIZE)
@@ -104,4 +109,5 @@ class SqlStorageTemplate(Storage):
         return d
 
     def _fix(self, value):
-        return "('{}', date('{}'), time('{}'), '{}', {})".format(*value)
+        return "('{}', date('{}'), time('{}'), '{}', {})"\
+            .format(value[0], fix_date(value[1]), value[2], value[3], value[4])

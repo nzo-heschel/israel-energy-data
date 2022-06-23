@@ -30,6 +30,9 @@ class Storage:
         """Retrieve values for the given range of dates."""
         pass
 
+    def latest_date(self, namespace):
+        pass
+
     def size(self):
         pass
 
@@ -48,6 +51,8 @@ def fix_date(date):
 
 
 def unfix_date(date):
+    if not date:
+        return None
     str_date = str(date)
     return str_date[8:10] + "-" + str_date[5:7] + "-" + str_date[0:4] if str_date[4] == "-" else str_date
 

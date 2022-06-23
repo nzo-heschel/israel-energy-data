@@ -71,6 +71,10 @@ class InMemCache(Storage):
     def as_dictionary(self):
         return dict(self._in_mem_cache)
 
+    def latest_date(self, namespace):
+        per_namespace = self._in_mem_cache.get(namespace)
+        return unfix_date(max(per_namespace)) if per_namespace else None
+
     def size(self):
         return _count(self._in_mem_cache)
 
