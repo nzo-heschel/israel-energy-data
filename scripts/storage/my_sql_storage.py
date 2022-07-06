@@ -19,8 +19,8 @@ class MySqlStorage(SqlStorageTemplate):
     def __init__(self, uri):
         self.url = furl(uri)
         self.db = self._init_connection()
-        self._execute_query("CREATE DATABASE IF NOT EXISTS main_table")
-        self.db = self._init_connection(database="main_table")
+        self._execute_query("CREATE DATABASE IF NOT EXISTS energy_data")
+        self.db = self._init_connection(database="energy_data")
         self._execute_query(self.SQL_CREATE_TABLE)
 
     def _init_connection(self, database=None):
