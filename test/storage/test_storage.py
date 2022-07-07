@@ -1,3 +1,4 @@
+import datetime
 import unittest
 from parameterized import parameterized_class
 import scripts.storage.storage_util as storage
@@ -7,6 +8,7 @@ DATE_1_2_22 = "01-02-2022"
 DATE_2_2_22 = "02-02-2022"
 TAG_1 = "T-1"
 TAG_2 = "T-2"
+TAG_3 = "T-3"
 
 PARAMS = [
     ("cache",),
@@ -99,6 +101,33 @@ class TestStorageNoPopulate(unittest.TestCase):
         self.store.bulk_insert(values)
         v = self.store.retrieve_value(namespace=NAMESPACE, date=DATE_1_2_22, tag=TAG_1, time="11:11")
         self.assertEqual(6.0, v)
+
+
+@parameterized_class("uri", PARAMS)
+class TestStorageMonthly(unittest.TestCase):
+    def setUp(self):
+        self.store = storage.new_instance(self.uri)
+        for day in range(1, 21):  # total 20 days
+            date1 = datetime.date(2011, 1, day).strftime("%d-%m-%Y")
+            date2 = datetime.date(2011, 2, day).strftime("%d-%m-%Y")
+            self.store.insert(NAMESPACE, date1, "10:00", TAG_1, 1.0)
+            self.store.insert(NAMESPACE, date1, "10:30", TAG_1, 2.0)
+            self.store.insert(NAMESPACE, date1, "10:30", TAG_2, 2.0)
+            self.store.insert(NAMESPACE, date2, "10:00", TAG_1, 5.0)
+            self.store.insert(NAMESPACE, date2, "10:00", TAG_2, 2.0)
+
+    def test_by_month(self):
+        v1 = self.store.retrieve_range(NAMESPACE, "08-01-2011", "05-02-2011", time="month")
+        # 13 days in January (8 to 20)
+        self.assertEqual(39, v1[NAMESPACE]["01-01-2011"]["00:00"][TAG_1])
+        self.assertEqual(26, v1[NAMESPACE]["01-01-2011"]["00:00"][TAG_2])
+        # 5 days in February (1 to 5)
+        self.assertEqual(25, v1[NAMESPACE]["01-02-2011"]["00:00"][TAG_1])
+        self.assertEqual(10, v1[NAMESPACE]["01-02-2011"]["00:00"][TAG_2])
+
+        v2 = self.store.retrieve_range(NAMESPACE, "08-01-2011", "12-01-2011", time="month", tag=TAG_1)
+        self.assertEqual(1, len(v2[NAMESPACE]["01-01-2011"]["00:00"]))
+        self.assertEqual(15, v2[NAMESPACE]["01-01-2011"]["00:00"][TAG_1])
 
 
 class TestStorageNonParametrized(unittest.TestCase):

@@ -22,8 +22,10 @@ class SqlStorageTemplate(Storage):
 
     SQL_SUM_HOUR = None
     SQL_SUM_DAY = None
+    SQL_SUM_MONTH = None
     SQL_GROUP_BY_DATE = None
     SQL_GROUP_BY_HOUR = None
+    SQL_GROUP_BY_MONTH = None
 
     SQL_SIZE = "SELECT count(*) from main_table"
 
@@ -82,11 +84,15 @@ class SqlStorageTemplate(Storage):
             sql_and_date = self.SQL_AND_DATE.format(date=date)
         else:
             sql_and_date = self.SQL_AND_DATE_RANGE.format(from_date=date_from, to_date=date_to)
-        if time == "day":
-            query = (self.SQL_SUM_DAY + sql_and_date + (self.SQL_AND_TAG if tag else "") + self.SQL_GROUP_BY_DATE) \
+        sql_and_tag = self.SQL_AND_TAG if tag else ""
+        if time == "month":
+            query = (self.SQL_SUM_MONTH + sql_and_date + sql_and_tag + self.SQL_GROUP_BY_MONTH) \
+                .format(namespace=namespace, tag=tag)
+        elif time == "day":
+            query = (self.SQL_SUM_DAY + sql_and_date + sql_and_tag + self.SQL_GROUP_BY_DATE) \
                 .format(namespace=namespace, tag=tag)
         elif time == "hour":
-            query = (self.SQL_SUM_HOUR + sql_and_date + (self.SQL_AND_TAG if tag else "") + self.SQL_GROUP_BY_HOUR) \
+            query = (self.SQL_SUM_HOUR + sql_and_date + sql_and_tag + self.SQL_GROUP_BY_HOUR) \
                 .format(namespace=namespace, tag=tag)
         else:
             query = (self.SQL_RETRIEVE + sql_and_date +
