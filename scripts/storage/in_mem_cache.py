@@ -64,9 +64,20 @@ class InMemCache(Storage):
         proper_date_from = fix_date(from_date)
         proper_date_to = fix_date(to_date)
         dates = [date for date in values.keys() if proper_date_from <= fix_date(date) <= proper_date_to]
-        return_values = {unfix_date(date): self.retrieve(namespace, date, time, tag).get(namespace).get(date)
-                         for date in dates}
-        return {namespace: return_values}
+        if time == "month":
+            per_month = {}
+            for date in dates:
+                date_prefix = date[0:7]
+                date_key = unfix_date(date_prefix + "-01")
+                per_month[date_key] = per_month.get(date_key, {"00:00": {}})
+                per_tag = self.retrieve(namespace, date, "day", tag).get(namespace).get(date).get("00:00")
+                for t in per_tag:
+                    per_month[date_key]["00:00"][t] = per_month[date_key]["00:00"].get(t, 0) + per_tag[t]
+            return {namespace: per_month}
+        else:
+            return_values = {unfix_date(date): self.retrieve(namespace, date, time, tag).get(namespace).get(date)
+                             for date in dates}
+            return {namespace: return_values}
 
     def as_dictionary(self):
         return dict(self._in_mem_cache)

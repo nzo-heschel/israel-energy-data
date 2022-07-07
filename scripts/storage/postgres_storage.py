@@ -14,8 +14,11 @@ class PostgresStorage(SqlStorageTemplate):
                    "WHERE namespace = '{namespace}' "
     SQL_SUM_DAY = "SELECT namespace, date, '00:00', tag, SUM(value) from main_table " \
                   "WHERE namespace = '{namespace}' "
+    SQL_SUM_MONTH = "SELECT namespace, to_char(date, 'YYYY-MM-01'), '00:00', tag, sum(value) from main_table " \
+                    "WHERE namespace = '{namespace}' "
     SQL_GROUP_BY_DATE = " GROUP BY namespace, date, tag"
     SQL_GROUP_BY_HOUR = " GROUP BY namespace, date, hour, tag"
+    SQL_GROUP_BY_MONTH = "GROUP BY namespace, to_char(date, 'YYYY-MM-01'), tag"
 
     def __init__(self, uri):
         self.url = furl(uri)

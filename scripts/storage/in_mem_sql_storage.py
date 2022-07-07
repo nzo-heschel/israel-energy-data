@@ -13,8 +13,11 @@ class InMemSqlStorage(SqlStorageTemplate):
                    "WHERE namespace = '{namespace}' "
     SQL_SUM_DAY = "SELECT namespace, date, '00:00', tag, SUM(value) from main_table " \
                   "WHERE namespace = '{namespace}' "
+    SQL_SUM_MONTH = "SELECT namespace, strftime('%Y-%m-01', date), '00:00', tag, SUM(value) from main_table " \
+                    "WHERE namespace = '{namespace}' "
     SQL_GROUP_BY_DATE = " GROUP BY date, tag"
     SQL_GROUP_BY_HOUR = " GROUP BY date, strftime('%H', time), tag"
+    SQL_GROUP_BY_MONTH = " GROUP BY strftime('%Y-%m-01', date), tag"
 
     def __init__(self, uri="sqlite://energy-data"):
         self.url = furl(uri)

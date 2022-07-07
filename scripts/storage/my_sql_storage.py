@@ -13,8 +13,11 @@ class MySqlStorage(SqlStorageTemplate):
                    "WHERE namespace = '{namespace}' "
     SQL_SUM_DAY = "SELECT namespace, date, time('00:00'), tag, SUM(value) from main_table " \
                   "WHERE namespace = '{namespace}' "
+    SQL_SUM_MONTH = "SELECT namespace, date(concat_ws('-', year(date), month(date), 1)), '00:00', tag, SUM(value) from main_table " \
+                    "WHERE namespace = '{namespace}' "
     SQL_GROUP_BY_DATE = " GROUP BY date, tag"
     SQL_GROUP_BY_HOUR = " GROUP BY date, hour(time), tag"
+    SQL_GROUP_BY_MONTH = "GROUP BY date(concat_ws('-', year(date), month(date), 1)), tag"
 
     def __init__(self, uri):
         self.url = furl(uri)
