@@ -1,49 +1,50 @@
 import datetime
 import logging
 import os
-import bottle
-from bottle import route
 from dateutil.relativedelta import relativedelta
 import http.client
 import scripts.noga as noga
 import scripts.storage.storage_util as storage
+from flask import Flask, render_template, request
 
 PORT = int(os.environ.get("PORT", 9999))
 SMP_DATE_FORMAT = "%d-%m-%Y"
 STORAGE_URI = os.environ.get('STORAGE_URI', "mysql://root:mysql_root_123@localhost:3306")
 store = storage.new_instance(STORAGE_URI)
 
-
-@route('/')
-def hello():
-    return bottle.static_file(filename="index.html", root=os.environ['PYTHONPATH'] + "/" + "resources")
+app = Flask(__name__, template_folder='../resources')
 
 
-@route('/update')
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+
+@app.route('/update')
 def update():
     try:
-        source, data_type, start_date, end_date = query_variables(bottle.request.query)[0:4]
+        source, data_type, start_date, end_date = query_variables(request.args)[0:4]
         if source == "noga" or source == "all":
             noga.update(store, noga_type=data_type, start_date=start_date, end_date=end_date)
     except Exception as ex:
         logging.exception("Error: %s", ex)
-        return bottle.HTTPError(status=400, body=ex)
-    return bottle.HTTPResponse(status=200, body="OK")
+        return "Error: {}".format(ex), 400
+    return "OK"
 
 
-@route('/get')
+@app.route('/get')
 def get():
     try:
-        source, data_type, start_date, end_date, tag, result_format, time = query_variables(bottle.request.query)
+        source, data_type, start_date, end_date, tag, result_format, time = query_variables(request.args)
         data = {}
         if source == "noga":
             data = noga.get(store, noga_type=data_type, start_date=start_date,
                             end_date=end_date, tag=tag, time=time)
         formatted_data = format_data(data, result_format)
-        return bottle.HTTPResponse(status=200, body=formatted_data)
+        return formatted_data
     except Exception as ex:
-        logging.error(ex)
-        return bottle.HTTPError(status=400, body=ex)
+        logging.exception("Error: %s", ex)
+        return "Error: {}".format(ex), 400
 
 
 def format_data(data, result_format):
@@ -59,14 +60,14 @@ def default_dates():
     return start, end
 
 
-def query_variables(query):
-    source = query.source or "all"
-    data_type = query.type or "all"
-    start_date = query.start_date
-    end_date = query.end_date or default_dates()[1]  # today
-    result_format = query.format or "json"
-    time = query.time or "hour"
-    tag = query.tag or None
+def query_variables(args):
+    source = args.get('source', "all")
+    data_type = args.get('type', "all")
+    start_date = args.get('start_date')
+    end_date = args.get('end_date', default_dates()[1])  # today
+    result_format = args.get('format', "json")
+    time = args.get('time', "hour")
+    tag = args.get('tag')
     return source, data_type, start_date, end_date, tag, result_format, time
 
 
@@ -83,4 +84,5 @@ if __name__ == "__main__":
     logging.basicConfig(format=FORMAT, level=logging.INFO)
     http_debug_level(1)
     logging.info("Starting")
-    bottle.run(host='0.0.0.0', port=PORT, debug=True, reloader=True)
+    from waitress import serve
+    serve(app, host="0.0.0.0", port=PORT)
