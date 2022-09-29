@@ -40,7 +40,7 @@ def update(store, noga_type, start_date, end_date):
     for namespace in result:
         for entry in result.get(namespace):
             date0 = entry.get("Date")
-            date = date0[8:10]+"-"+date0[5:7]+"-"+date0[0:4]
+            date = date0.replace("/", "-")
             time = entry.get("Time")
             for tag in [key for key in entry.keys() if key not in ["Date", "Time"]]:
                 values.append((namespace, date, time[0:5], tag, entry.get(tag)))
