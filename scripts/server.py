@@ -1,4 +1,5 @@
 import datetime
+import json
 import logging
 import os
 from dateutil.relativedelta import relativedelta
@@ -6,6 +7,7 @@ import http.client
 import scripts.noga as noga
 import scripts.storage.storage_util as storage
 from flask import Flask, render_template, request
+import pandas as pd
 
 PORT = int(os.environ.get("PORT", 9999))
 SMP_DATE_FORMAT = "%d-%m-%Y"
@@ -48,8 +50,38 @@ def get():
 
 
 def format_data(data, result_format):
-    if result_format == "json":
-        return data
+    match result_format:
+        case "html":
+            return json_to_df(data).fillna('').to_html(index=False)
+        case "csv":
+            return app.response_class(
+                response=json_to_df(data).to_csv(index=False, sep=","),
+                status=200,
+                mimetype='text/plain'
+            )
+        case "tsv":
+            return app.response_class(
+                response=json_to_df(data).to_csv(index=False, sep="\t"),
+                status=200,
+                mimetype='text/plain'
+            )
+    # default format: json
+    return app.response_class(
+        response=json.dumps(data, indent=2),
+        status=200,
+        mimetype='application/json'
+    )
+
+
+def json_to_df(json_data):
+    results = []
+    for namespace, v1 in json_data.items():
+        for date, v2 in v1.items():
+            for time, tag_value_pairs in v2.items():
+                line = {"type": namespace, "date": date, "time": time}
+                line.update(tag_value_pairs)
+                results.append(line)
+    return pd.DataFrame(results)
 
 
 def default_dates():
