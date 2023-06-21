@@ -1,5 +1,7 @@
 import json
 import logging
+import re
+
 import requests
 import os
 import datetime
@@ -42,8 +44,9 @@ def update(store, noga_type, start_date, end_date):
             date0 = entry.get("Date")
             date = date0.replace("/", "-")
             time = entry.get("Time")
-            for tag in [key for key in entry.keys() if key not in ["Date", "Time", "FileDate"]]:
-                values.append((namespace, date, time[0:5], tag, entry.get(tag)))
+            for tag in [key for key in entry.keys() if key not in ["Date", "Time", "FileDate", "IsOnBlobList"]]:
+                val = re.sub(r'[^0-9.]', '', str(entry.get(tag)).strip())
+                values.append((namespace, date, time[0:5], tag, val))
                 count = count + 1
                 total_count = total_count + 1
                 if count > 100:
