@@ -111,10 +111,14 @@ def http_debug_level(level):
     requests_log.propagate = True
 
 
-if __name__ == "__main__":
+def main():
     FORMAT = '%(asctime)s : %(message)s'
     logging.basicConfig(format=FORMAT, level=logging.INFO)
     http_debug_level(1)
     logging.info("Starting")
     from waitress import serve
     serve(app, host="0.0.0.0", port=PORT)
+
+
+if __name__ == "__main__":
+    main()
