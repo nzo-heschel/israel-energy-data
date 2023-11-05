@@ -67,6 +67,8 @@ def get(store, noga_type, start_date, end_date, tag, time="hour"):
     for a_type in noga_types:
         data = store.retrieve_range("noga." + a_type, start_date, end_date, time=time, tag=tag)
         result.update(data)
+    for key in result:
+        logging.info("Retrived {} items of type {}".format(sum(len(v) for v in result[key].values()), key))
     return result
 
 
