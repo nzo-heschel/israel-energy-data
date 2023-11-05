@@ -1,6 +1,6 @@
 import json
 from datetime import datetime
-from urllib.error import HTTPError
+from urllib.error import URLError
 
 import time
 from urllib.request import urlopen
@@ -42,7 +42,7 @@ def retrieve_data():
             logging.info("Executing URL call")
             response = urlopen(YEAR_URL)
             break
-        except HTTPError as ex:
+        except URLError as ex:
             logging.warning("Exception while trying to get data: " + str(ex))
             logging.warning("Retry #{} in 2 seconds".format(retry + 1))
             time.sleep(2)
