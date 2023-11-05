@@ -1,7 +1,10 @@
 import json
 from datetime import datetime
+from urllib.error import HTTPError
+
 import time
 from urllib.request import urlopen
+import logging
 
 from dash import Dash, dcc, html
 import plotly.graph_objects as go
@@ -23,26 +26,33 @@ bar_color = {2021: {"conv": "Gray", "ren": "Green"},
 
 
 def legend(year, total, total_renewable=None):
-    return '{:.0f}: {:.2f} TWh ({:.2f}%)'.format(year, total_renewable, total_renewable / total * 100) if total_renewable \
+    return '{:.0f}: {:.2f} TWh ({:.2f}%)'.format(
+            year, total_renewable, total_renewable / total * 100) if total_renewable \
         else '{:.0f}: {:.2f} TWh'.format(year, total)
 
 
 def print_year(renewables, total):
-    print("2021: {:.2f} / {:.2f} ({:.2f}%)".format(renewables / 1e3, total / 1e3, renewables / total * 100))
+    logging.info("2021: {:.2f} / {:.2f} ({:.2f}%)".format(renewables / 1e3, total / 1e3, renewables / total * 100))
 
 
-def bar_chart():
+def retrieve_data():
     response = None
     for retry in range(5):
         try:
+            logging.info("Executing URL call")
             response = urlopen(YEAR_URL)
             break
-        except:
-            print("Retry", retry)
+        except HTTPError as ex:
+            logging.warning("Exception while trying to get data: " + str(ex))
+            logging.warning("Retry #{} in 2 seconds".format(retry + 1))
             time.sleep(2)
     if not response:
-        print("Server unreachable")
+        logging.error("Could not get data from server")
         exit(1)
+    return response
+
+
+def bar_chart(response):
     string = response.read().decode('utf-8')
     json_list = json.loads(string)
     cost_data_all = dict(sorted(json_list["noga.cost"].items(), key=lambda d: datetime.strptime(d[0], "%d-%m-%Y")))
@@ -111,15 +121,24 @@ def per_year_stacked_bar(cost_data, group):
     return trace_ren, trace_conv, total, total_renewable
 
 
-
-def main():
-    fig = bar_chart()
-    dash_app.layout = html.Div([
-        # html.H1('ייצור חשמל בישראל', style={'textAlign': 'center'}),
+def layout():
+    response = retrieve_data()
+    fig = bar_chart(response)
+    _layout = html.Div([
         dcc.Graph(id="graph", config={'displayModeBar': False}, figure=fig),
     ])
+    return _layout
 
+
+def main():
+    FORMAT = '%(asctime)s : %(message)s'
+    logging.basicConfig(format=FORMAT, level=logging.INFO)
+    logging.info("Starting")
+    # Using a reference to the function (not a function call) makes the graph
+    # reload (using fresh data from the server) on page refresh.
+    dash_app.layout = layout
     dash_app.run_server(debug=False, host='0.0.0.0', port=9998)
+
 
 if __name__ == "__main__":
     main()
