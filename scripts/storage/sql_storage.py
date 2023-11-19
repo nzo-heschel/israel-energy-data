@@ -40,7 +40,6 @@ class SqlStorageTemplate(Storage):
         curr = self._get_db_cursor()
         curr.execute(query)
         records = curr.fetchall()
-        curr.close()
         return records
 
     def _execute_query(self, *queries):
@@ -48,7 +47,6 @@ class SqlStorageTemplate(Storage):
         for query in queries:
             curr.execute(query)
         self.db.commit()
-        curr.close()
 
     def retrieve_value(self, namespace, date, time, tag):
         records = self._get_records((self.SQL_RETRIEVE+self.SQL_AND_DATE+self.SQL_AND_TAG+self.SQL_AND_TIME)
