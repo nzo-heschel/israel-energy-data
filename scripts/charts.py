@@ -1,6 +1,6 @@
 import json
 from datetime import datetime
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 
 import time
 from urllib.request import urlopen
@@ -31,18 +31,20 @@ def legend(year, total, total_renewable=None):
         else '{:.0f}: {:.2f} TWh'.format(year, total)
 
 
-def print_year(renewables, total):
-    logging.info("2021: {:.2f} / {:.2f} ({:.2f}%)".format(renewables / 1e3, total / 1e3, renewables / total * 100))
+def print_year(yr, renewables, total):
+    logging.info("{:.0f}: {:.2f} / {:.2f} ({:.2f}%)".format(yr, renewables / 1e3, total / 1e3, renewables / total * 100))
 
 
 def retrieve_data():
     response = None
-    for retry in range(5):
+    retry = 1
+    while True:
+        retry += 1
         try:
             logging.info("Executing URL call")
             response = urlopen(YEAR_URL)
             break
-        except HTTPError as ex:
+        except (HTTPError, URLError) as ex:
             logging.warning("Exception while trying to get data: " + str(ex))
             logging.warning("Retry #{} in 2 seconds".format(retry + 1))
             time.sleep(2)
@@ -62,9 +64,9 @@ def bar_chart(response):
     trace_ren_2021, trace_conv_2021, total_2021, total_renewable_2021 = per_year_stacked_bar(cost_data_2021, 2021)
     trace_ren_2022, trace_conv_2022, total_2022, total_renewable_2022 = per_year_stacked_bar(cost_data_2022, 2022)
     trace_ren_2023, trace_conv_2023, total_2023, total_renewable_2023 = per_year_stacked_bar(cost_data_2023, 2023)
-    print_year(total_renewable_2021, total_2021)
-    print_year(total_renewable_2022, total_2022)
-    print_year(total_renewable_2023, total_2023)
+    print_year(2021, total_renewable_2021, total_2021)
+    print_year(2022, total_renewable_2022, total_2022)
+    print_year(2023, total_renewable_2023, total_2023)
     fig = go.Figure(data=[trace_conv_2021, trace_ren_2021,
                           trace_conv_2022, trace_ren_2022,
                           trace_conv_2023, trace_ren_2023],
