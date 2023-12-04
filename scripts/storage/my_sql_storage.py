@@ -1,6 +1,10 @@
 from scripts.storage.sql_storage import SqlStorageTemplate
 import mysql.connector
 from furl import furl
+import logging
+
+
+energy_db_name = "energy_data"
 
 
 class MySqlStorage(SqlStorageTemplate):
@@ -23,7 +27,7 @@ class MySqlStorage(SqlStorageTemplate):
         self.url = furl(uri)
         self.db = self._init_connection()
         self._execute_query("CREATE DATABASE IF NOT EXISTS energy_data")
-        self.db = self._init_connection(database="energy_data")
+        self.db = self._init_connection(database=energy_db_name)
         self._execute_query(self.SQL_CREATE_TABLE)
 
     def _init_connection(self, database=None):
@@ -35,3 +39,11 @@ class MySqlStorage(SqlStorageTemplate):
             return mysql.connector.connect(host=host, user=user, password=password, port=port, database=database)
         else:
             return mysql.connector.connect(host=host, user=user, password=password, port=port)
+
+    def _get_db_cursor(self):
+        try:
+            return self.db.cursor()
+        except mysql.connector.errors.OperationalError:
+            logging.info("Renew database connection")
+            self.db = self._init_connection(energy_db_name)
+            return self.db.cursor()
