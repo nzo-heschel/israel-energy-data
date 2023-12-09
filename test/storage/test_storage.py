@@ -4,6 +4,7 @@ from parameterized import parameterized_class
 import scripts.storage.storage_util as storage
 
 NAMESPACE = "a.b.c"
+NAMESPACE_2 = "1.2.3"  # only one date
 DATE_1_2_22 = "01-02-2022"
 DATE_2_2_22 = "02-02-2022"
 TAG_1 = "T-1"
@@ -13,8 +14,8 @@ TAG_3 = "T-3"
 PARAMS = [
     ("cache",),
     ("sqlite://",),
-    # ("mysql://root:mysql_root_123@localhost:3306",),
-    # ("postgres://postgres:postgrespw@localhost:55000",)
+    ("mysql://root:mysql_root_123@localhost:3306",),
+    ("postgres://postgres:postgrespw@localhost:32768",)
 ]
 
 
@@ -33,6 +34,8 @@ class TestStorage(unittest.TestCase):
         self.store.insert(NAMESPACE, DATE_2_2_22, "03:40", TAG_2, 9.0)
         self.store.insert(NAMESPACE, DATE_2_2_22, "03:50", TAG_2, 10.0)
         self.store.insert(NAMESPACE, DATE_2_2_22, "06:40", TAG_2, 11.0)
+        self.store.insert(NAMESPACE_2, DATE_2_2_22, "03:50", TAG_2, 10.0)
+        self.store.insert(NAMESPACE_2, DATE_2_2_22, "06:40", TAG_2, 11.0)
 
     def setUp(self):
         self.store = storage.new_instance(self.uri)
@@ -72,10 +75,11 @@ class TestStorage(unittest.TestCase):
         self.assertEqual(1, len(value_day_tag[NAMESPACE][DATE_2_2_22]["00:00"]))
 
     def test_size(self):
-        self.assertEqual(11, self.store.size())
+        self.assertEqual(13, self.store.size())
 
     def test_latest_date(self):
         self.assertEqual(DATE_2_2_22, self.store.latest_date(NAMESPACE))
+        self.assertEqual(DATE_2_2_22, self.store.latest_date(NAMESPACE_2))
         self.assertIsNone(self.store.latest_date("foo"))
 
 

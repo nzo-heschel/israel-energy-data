@@ -27,11 +27,11 @@ def update():
     try:
         source, data_type, start_date, end_date = query_variables(request.args)[0:4]
         if source == "noga" or source == "all":
-            noga.update(store, noga_type=data_type, start_date=start_date, end_date=end_date)
+            response = noga.update(store, noga_type=data_type, start_date=start_date, end_date=end_date)
     except Exception as ex:
         logging.exception("Error: %s", ex)
         return "Error: {}".format(ex), 400
-    return "OK"
+    return response, 200
 
 
 @app.route('/get')
