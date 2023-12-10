@@ -33,8 +33,8 @@ def update(store, noga_type, start_date, end_date):
     result = {}
     for a_type in noga_types:
         namespace = "noga." + a_type
-        start_date = start_date or store.latest_date(namespace) or "01-01-2000"
-        json_list = request(a_type, start_date, end_date)
+        ns_start_date = start_date or store.latest_date(namespace) or "01-01-2000"
+        json_list = request(a_type, ns_start_date, end_date)
         result[namespace] = json_list
     values = []
     count = 0
@@ -56,6 +56,7 @@ def update(store, noga_type, start_date, end_date):
     if values:
         store.bulk_insert(values)
     logging.info("Inserted %s values into storage", total_count)
+    return "Inserted {} values into storage".format(total_count)
 
 
 def get(store, noga_type, start_date, end_date, tag, time="hour"):
@@ -68,7 +69,7 @@ def get(store, noga_type, start_date, end_date, tag, time="hour"):
         data = store.retrieve_range("noga." + a_type, start_date, end_date, time=time, tag=tag)
         result.update(data)
     for key in result:
-        logging.info("Retrived {} items of type {}".format(sum(len(v) for v in result[key].values()), key))
+        logging.info("Retrieved {} items of type {}".format(sum(len(v) for v in result[key].values()), key))
     return result
 
 
