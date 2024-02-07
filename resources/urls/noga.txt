@@ -6,6 +6,7 @@ Forecast (update):           https://www.noga-iso.co.il/Umbraco/Api/Documents/Ge
 SMP and Expost can also be downloaded to excel using the Surface/Export api.
 SMP:                         https://www.noga-iso.co.il/Umbraco/Surface/Export/ExportCost/?startDateString=01/01/2022&endDateString=30/03/2022&culture=he-IL&dataType=SMP
 Expost (cost):               https://www.noga-iso.co.il/Umbraco/Surface/Export/ExportCost/?startDateString=01/01/2022&endDateString=30/03/2022&culture=he-IL&dataType=Cost
+    but this api only includes Cost. No ConventionalGen, RenewableGen and SystemDemand.
 Forecast (a day in advance): https://www.noga-iso.co.il/Umbraco/Surface/Export/ExportCost/?startDateString=29/03/2022&endDateString=30/03/2022&culture=he-IL&dataType=DemandForecast&forecastType=1
 Forecast (update):           https://www.noga-iso.co.il/Umbraco/Surface/Export/ExportCost/?startDateString=29/03/2022&endDateString=30/03/2022&culture=he-IL&dataType=DemandForecast&forecastType=2
 
@@ -23,8 +24,10 @@ Demand Forcast: https://www.noga-iso.co.il/Umbraco/Surface/Export/ExportCost/?st
          The Api/Docuemtns url has a SystemDemand field which is not in the Surface/Export data
          This is the same as "Forecast (a day in advance)" above.
 Energy: https://www.noga-iso.co.il/Umbraco/Surface/Export/ExportCost/?startDateString=01/12/2023&culture=en-US&dataType=DemandForecastNEW&forecastCategory=6
+   can also do multiple days: https://www.noga-iso.co.il/Umbraco/Surface/Export/ExportCost/?startDateString=01/12/2023&endDateString=31/12/2023&culture=en-US&dataType=DemandForecastNEW&forecastCategory=6
 Renewable: https://www.noga-iso.co.il/Umbraco/Surface/Export/ExportCost/?startDateString=01/12/2023&culture=en-US&dataType=DemandForecastNEW&forecastCategory=7
-
+   can also do multiple days: https://www.noga-iso.co.il/Umbraco/Surface/Export/ExportCost/?startDateString=01/12/2023&endDateString=31/12/2023&culture=en-US&dataType=DemandForecastNEW&forecastCategory=7
+   Data in "Renewable" is subset of "Energy".
 from https://www.noga-iso.co.il/עקום-ביקוש
 SystemDemand: https://www.noga-iso.co.il/Umbraco/Surface/Export/ExportCost/?startDateString=01/12/2023&culture=en-US&dataType=DemandForcastCurveGraph
 Demand ahead: https://www.noga-iso.co.il/Umbraco/Api/Graph/GetDemandTableData/?dateString=06/12/2023
