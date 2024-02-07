@@ -1,13 +1,14 @@
-import json
 import logging
+import tempfile
+import urllib.request
+import pandas as pd
 import re
-
-import requests
+import urllib.request
 import os
 import datetime
 from dateutil.relativedelta import relativedelta
 
-noga_url = 'https://www.noga-iso.co.il/Umbraco/Api/Documents/GetCosts/?startDateString={}&endDateString={}&culture=he-IL&dataType={}'
+noga_file_url = 'https://www.noga-iso.co.il/Umbraco/Surface/Export/ExportCost/?startDateString={}&endDateString={}&culture=en-US&dataType={}'
 SMP_CONST = "ConstrainedSmp"
 SMP_UNCONST = "UnconstrainedSmp"
 
@@ -34,7 +35,7 @@ def update(store, noga_type, start_date, end_date):
     for a_type in noga_types:
         namespace = "noga." + a_type
         ns_start_date = start_date or store.latest_date(namespace) or "01-01-2000"
-        json_list = request(a_type, ns_start_date, end_date)
+        json_list = request_file(a_type, ns_start_date, end_date)
         result[namespace] = json_list
     values = []
     count = 0
@@ -86,21 +87,52 @@ NOGA_TYPE_MAPPING = {
 }
 
 
-def request(noga_type, start_date, end_date):
+def request_file(noga_type, start_date, end_date):
     logging.info("Request noga/%s data from %s to %s", noga_type, start_date, end_date)
     data_type = NOGA_TYPE_MAPPING.get(noga_type)
     if data_type is None:
         return {"error": "Unrecognized Noga type"}
     start_date = start_date.replace("-", "/")
     end_date = end_date.replace("-", "/")
-    logging.info(noga_url.format(start_date, end_date, data_type))
-    response = requests.get(noga_url.format(start_date, end_date, data_type), proxies=proxies)
-    # response = urlopen(noga_url.format(start_date, end_date))
-    logging.info("Received noga.%s data with status code %s", noga_type, response.status_code)
-    if response.status_code >= 400:
-        raise ValueError(response.reason, json.loads(response.content)["Message"])
-    # Convert bytes to string type and string type to dict
-    string = response.content.decode('utf-8')
-    json_list = json.loads(string)
+    url = noga_file_url.format(start_date, end_date, data_type)
+    logging.info(url)
+    json_list = get_data_from_file(url)
     logging.info("Received %s values for noga.%s", len(json_list), noga_type)
     return json_list
+
+
+
+def get_data_from_file(url):
+    xl_file = tempfile.NamedTemporaryFile()
+
+    try:
+        urllib.request.urlretrieve(url, xl_file.name)
+        df = pd.read_excel(xl_file.name, header=1)
+    except Exception as ex:
+        raise ex
+    finally:
+        xl_file.close()
+
+    labels = df.columns.values.tolist()
+    logging.info("Labels: %s", labels)
+    df.drop(columns=[label for label in labels if label[:7] == "Unnamed"], inplace=True)
+    labels = df.columns.values.tolist()
+    new_labels = [camel_no_unit(label) for label in labels]
+    logging.info("New labels: %s", new_labels)
+    df.columns = new_labels  # rename columns
+    json_list = []
+    for row in df.itertuples():
+        json_row = {"Date": row.Date, "Time": row.Time}
+        for i in range(2, len(labels)):
+            json_row[new_labels[i]] = str(row[i+1])
+        json_list.append(json_row)
+    return json_list
+
+pattern_units = re.compile(r" [\[(].*[\])]")
+
+
+def camel_no_unit(s):
+    s = pattern_units.sub("", s)
+    s = s.title().replace(" ", "")
+    s = s.replace("Hour", "Time")
+    return s
