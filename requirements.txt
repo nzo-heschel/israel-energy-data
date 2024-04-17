@@ -1,14 +1,15 @@
-waitress==2.1.2
-Flask==2.3.2
-python-dateutil==2.8.2
+waitress==3.0.0
+Flask==3.0.3
+python-dateutil==2.9.0.post0
 requests==2.31.0
-DateTime==5.0
-mysql-connector-python==8.0.33
+DateTime==5.5
+mysql-connector-python==8.3.0
 furl~=2.1.3
-psycopg==3.1.8
-psycopg2-binary==2.9.5
-pandas==1.5.3
+psycopg==3.1.18
+psycopg2-binary==2.9.9
+pandas==2.2.2
 
-numpy~=1.24.1
-plotly~=5.12.0
-dash~=2.7.1
+numpy==1.26.4
+plotly==5.20.0
+dash==2.16.1
+openpyxl~=3.1.2
