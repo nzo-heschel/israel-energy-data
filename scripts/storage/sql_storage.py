@@ -4,7 +4,7 @@ from scripts.storage.storage_top import Storage, fix_date, unfix_date, unfix_tim
 class SqlStorageTemplate(Storage):
 
     SQL_CREATE_TABLE = "CREATE TABLE IF NOT EXISTS main_table " \
-                       "(namespace VARCHAR(80), date DATE, time TIME, tag VARCHAR(20), value REAL, " \
+                       "(namespace VARCHAR(80), date DATE, time TIME, tag VARCHAR(50), value REAL, " \
                        "CONSTRAINT main_table_pk PRIMARY KEY (namespace, date, time, tag))"
 
     SQL_INSERT = "INSERT INTO main_table VALUES "

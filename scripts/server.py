@@ -26,7 +26,7 @@ def index():
 def update():
     try:
         source, data_type, start_date, end_date = query_variables(request.args)[0:4]
-        if source == "noga" or source == "all":
+        if source == "noga2" or source == "all":
             response = noga.update(store, noga_type=data_type, start_date=start_date, end_date=end_date)
     except Exception as ex:
         logging.exception("Error: %s", ex)
@@ -39,8 +39,8 @@ def get():
     try:
         source, data_type, start_date, end_date, tag, result_format, time = query_variables(request.args)
         data = {}
-        if source == "noga":
-            data = noga.get(store, noga_type=data_type, start_date=start_date,
+        if source == "noga" or source == "noga2":
+            data = noga.get(store, source, noga_type=data_type, start_date=start_date,
                             end_date=end_date, tag=tag, time=time)
         formatted_data = format_data(data, result_format)
         return formatted_data
