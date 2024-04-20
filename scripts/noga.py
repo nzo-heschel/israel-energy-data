@@ -76,7 +76,7 @@ def update(store, noga_type, start_date, end_date):
 
 
 def get(store, source, noga_type, start_date, end_date, tag, time="hour"):
-    noga_types = NOGA_TYPE_MAPPING if noga_type == "all" else [noga_type] if noga_type else NOGA_TYPE_MAPPING
+    noga_types = NOGA2_TYPE_MAPPING if noga_type == "all" else [noga_type] if noga_type else NOGA2_TYPE_MAPPING
     start_date = start_date or one_month_ago()
     logging.info("Retrieving %s data with type(s) %s from %s until %s with \"%s\" interval and tag \"%s\"",
                  source, ", ".join(noga_types), start_date, end_date, time, tag)
@@ -92,14 +92,6 @@ def get(store, source, noga_type, start_date, end_date, tag, time="hour"):
 def one_month_ago():
     date = datetime.date.today() + relativedelta(months=-1)
     return date.strftime("%d-%m-%Y")
-
-
-NOGA_TYPE_MAPPING = {
-    'smp': NogaType('SMP'),
-    'cost': NogaType('Cost'),
-    'forecast1': NogaType('DemandForecast&forecastType=1'),
-    'forecast2': NogaType('DemandForecast&forecastType=2'),
-}
 
 
 NOGA2_TYPE_MAPPING = {
