@@ -147,7 +147,6 @@ def get_data_from_file(url):
     retry = 1
     while retry:
         xl_file = tempfile.NamedTemporaryFile()
-
         try:
             urllib.request.urlretrieve(url, xl_file.name)
             df = pd.read_excel(xl_file.name, header=1)
@@ -179,6 +178,11 @@ def get_data_from_file(url):
     new_labels = [camel_no_unit(label) for label in labels]
     logging.info("New labels: %s", new_labels)
     df.columns = new_labels  # rename columns
+    count_before = len(df.index)
+    df.drop_duplicates(inplace=True)
+    count_after = len(df.index)
+    if count_after < count_before:
+        logging.info("Dropped duplicates. Before: %s. After: %s.", count_before, count_after)
     json_list = []
     for row in df.itertuples():
         json_row = {"Date": row.Date, "Time": row.Time}
