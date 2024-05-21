@@ -1,4 +1,80 @@
-SMP: https://www.noga-iso.co.il/Umbraco/Api/Documents/GetCosts/?startDateString=01/01/2022&endDateString=30/03/2022&culture=he-IL&dataType=SMP
-Expost: https://www.noga-iso.co.il/Umbraco/Api/Documents/GetCosts/?startDateString=01/01/2022&endDateString=30/03/2022&culture=he-IL&dataType=Cost
+As of beginning of 2024, the json calls Api/Documents/GetCosts URLS return an error message.
+Similarly the Api/Graph URLs.
+They seem to be working internally from Noga's own website, but not externally.
+We will be using the excel file API calls Surface/Export/ExportCost instead.
+Calls marked with * below are used
+
+SMP:                         https://www.noga-iso.co.il/Umbraco/Api/Documents/GetCosts/?startDateString=01/01/2022&endDateString=30/03/2022&culture=he-IL&dataType=SMP
+Expost (cost):               https://www.noga-iso.co.il/Umbraco/Api/Documents/GetCosts/?startDateString=01/01/2022&endDateString=30/03/2022&culture=he-IL&dataType=Cost
 Forecast (a day in advance): https://www.noga-iso.co.il/Umbraco/Api/Documents/GetCosts/?startDateString=29/03/2022&endDateString=30/03/2022&culture=he-IL&dataType=DemandForecast&forecastType=1
-Forecast (update): https://www.noga-iso.co.il/Umbraco/Api/Documents/GetCosts/?startDateString=29/03/2022&endDateString=30/03/2022&culture=he-IL&dataType=DemandForecast&forecastType=2
+Forecast (update):           https://www.noga-iso.co.il/Umbraco/Api/Documents/GetCosts/?startDateString=29/03/2022&endDateString=30/03/2022&culture=he-IL&dataType=DemandForecast&forecastType=2
+
+SMP and Expost can also be downloaded to excel using the Surface/Export api.
+* SMP:                         https://www.noga-iso.co.il/Umbraco/Surface/Export/ExportCost/?startDateString=01/01/2022&endDateString=30/03/2022&culture=he-IL&dataType=SMP
+* Expost (cost):               https://www.noga-iso.co.il/Umbraco/Surface/Export/ExportCost/?startDateString=01/01/2022&endDateString=30/03/2022&culture=he-IL&dataType=Cost
+    but this api only includes Cost. No ConventionalGen, RenewableGen and SystemDemand.
+* Forecast (a day in advance): https://www.noga-iso.co.il/Umbraco/Surface/Export/ExportCost/?startDateString=29/03/2022&endDateString=30/03/2022&culture=he-IL&dataType=DemandForecast&forecastType=1
+* Forecast (update):           https://www.noga-iso.co.il/Umbraco/Surface/Export/ExportCost/?startDateString=29/03/2022&endDateString=30/03/2022&culture=he-IL&dataType=DemandForecast&forecastType=2
+
+
+From https://www.noga-iso.co.il/demandforecastnew
+
+* Market: https://www.noga-iso.co.il/Umbraco/Surface/Export/ExportCost/?startDateString=01/12/2023&endDateString=31/12/2023&culture=en-US&dataType=DemandForecastNEW&forecastCategory=1
+        or https://www.noga-iso.co.il/Umbraco/Api/Documents/GetCosts/?startDateString=01/12/2023&endDateString=31/12/2023&culture=en-US&dataType=DemandForecastNEW&&forecatCategory=1
+* Producer: https://www.noga-iso.co.il/Umbraco/Surface/Export/ExportCost/?startDateString=01/12/2023&endDateString=31/12/2023&culture=en-US&dataType=DemandForecastNEW&forecastCategory=2
+       or https://www.noga-iso.co.il/Umbraco/Api/Documents/GetCosts/?startDateString=01/12/2023&endDateString=31/12/2023&culture=en-US&dataType=DemandForecastNEW&forecatCategory=2
+* Reserve: https://www.noga-iso.co.il/Umbraco/Surface/Export/ExportCost/?startDateString=01/12/2023&endDateString=31/12/2023&culture=en-US&dataType=DemandForecastNEW&forecastCategory=3
+      or https://www.noga-iso.co.il/Umbraco/Api/Documents/GetCosts/?startDateString=01/12/2023&endDateString=31/12/2023&culture=en-US&dataType=DemandForecastNEW&forecatCategory=3
+Demand Forcast: https://www.noga-iso.co.il/Umbraco/Surface/Export/ExportCost/?startDateString=01/12/2023&endDateString=31/12/2023&culture=en-US&dataType=DemandForecastNEW&forecastCategory=5
+         or https://www.noga-iso.co.il/Umbraco/Api/Documents/GetCosts/?startDateString=01/12/2023&endDateString=31/12/2023&culture=en-US&dataType=DemandForecastNEW&forecastCategory=5
+         The Api/Docuemtns url has a SystemDemand field which is not in the Surface/Export data
+         This is ALMOST the same as "Forecast (a day in advance)" above.
+         Some days are missing (for example 1-26/3/24 returns 3,4,5,7,10...).
+
+from https://www.noga-iso.co.il/עקום-ביקוש
+
+* SystemDemand: https://www.noga-iso.co.il/Umbraco/Surface/Export/ExportCost/?startDateString=24/03/2024&endDateString=25/03/2024&culture=en-US&dataType=DemandForcastCurveGraph&forecastCategory=6
+    forecastCategory is not required
+    can only handle short periods (a few days)
+Demand ahead: https://www.noga-iso.co.il/Umbraco/Api/Graph/GetDemandTableData/?dateString=06/12/2023
+    This has 5 minutes granularity.
+    It has a "strange" strcuture: it has a few types of <Category>: "Demand-ahead", "trak_test", "RenewForecast"
+    and a category "94094485".
+    Demand ahead is the forecast a day in advance.
+    trak_test is the up-to-date forecast
+    94094485 is the actual demand - need to cross with other sources of data
+    Notice that actual demand is updated in real time (or maybe near real time). Pay attention when doing an update.
+
+from https://www.noga-iso.co.il/נתוני-פליטות-co2
+
+* CO2 emission: https://www.noga-iso.co.il/Umbraco/Surface/Export/ExportCost/?startDateString=01/03/2024&endDateString=25/03/2024&culture=he-IL&dataType=CO2
+    CO2 emmission per fuel (coal, soler (gasoil), gas, mazut (fueloil), methanol), savings from using renewables, total emissions
+CO2 emission ratio: https://www.noga-iso.co.il/Umbraco/Surface/Export/ExportCost/?startDateString=01/03/2024&endDateString=25/03/2024&culture=he-IL&dataType=CO2DoubleGraph
+    mTCO2/MWh can be computed from total emission per total production
+    total emissions is same as the value in CO2 emission data
+
+Can also get individual days as JSON (instead of range of dates as XL)
+https://www.noga-iso.co.il/Umbraco/Api/Documents/GetCo2OverviewData?isTest=false
+https://www.noga-iso.co.il/Umbraco/Api/Graph/GetCO2Data?dateString=12/12/2023
+https://www.noga-iso.co.il/Umbraco/Api/Graph/GetCO2ChartData/?dateString=12/12/2023
+https://www.noga-iso.co.il/Umbraco/Api/Graph/GetCO2DoubleChartData/?dateString=12/12/2023
+
+
+Home page
+https://www.noga-iso.co.il/Umbraco/Api/Documents/GetElectricalData
+This one is used on noga's homepage to show current production (consumption) and reserve, expected peak time, expected peak load, and expected peak reserve.
+
+In noga-iso.co.il/piechartspage:
+
+Energy: https://www.noga-iso.co.il/Umbraco/Surface/Export/ExportCost/?startDateString=01/12/2023&culture=en-US&dataType=DemandForecastNEW&forecastCategory=6
+*    can also do multiple days: https://www.noga-iso.co.il/Umbraco/Surface/Export/ExportCost/?startDateString=01/03/2024&endDateString=25/03/2024&culture=en-US&dataType=DemandForecastNEW&forecastCategory=6
+Renewable: https://www.noga-iso.co.il/Umbraco/Surface/Export/ExportCost/?startDateString=01/12/2023&culture=en-US&dataType=DemandForecastNEW&forecastCategory=7
+   can also do multiple days: https://www.noga-iso.co.il/Umbraco/Surface/Export/ExportCost/?startDateString=01/12/2023&endDateString=31/12/2023&culture=en-US&dataType=DemandForecastNEW&forecastCategory=7
+   Data in "Renewable" is subset of "Energy".
+
+https://www.noga-iso.co.il/Umbraco/Api/Graph/UpdatedForecast/?dateString=12/12/2023
+https://www.noga-iso.co.il/Umbraco/Api/Graph/GetSupplyData?dateString=12/12/2023
+https://www.noga-iso.co.il/Umbraco/Api/Graph/GetRenewableData?dateString=12/12/2023
+
+
+
