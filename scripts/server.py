@@ -34,6 +34,44 @@ def update():
     return response, 200
 
 
+@app.route('/upload', methods=['GET'])
+def upload_get():
+    return render_template("upload.html")
+
+
+@app.route('/upload/<source>', methods=['POST'])
+def upload_post(source):
+    # curl command example:
+    # curl -F 'file=@/Users/foo/Downloads/Energy_07_08_2023-07_08_2023.xlsx' localhost:9999/upload/noga
+    agent = request.environ['HTTP_USER_AGENT']
+    agent_short_name = agent.split(" ")[0]
+    f = request.files['file']
+    logging.info("Agent %s request to upload file %s with source %s",
+                 agent_short_name, f.filename, source)
+    result = {}
+    if source == "noga":
+        result = noga.upload(store, f)
+
+    curl = agent_short_name.startswith("curl")
+    if "success" in result:
+        if curl:
+            return "FIle {} uploaded successfully, {} values stored\n".format(f.filename, result["count"])
+        else:
+            return render_template("success.html", name=f.filename, count=result["count"])
+    else:
+        if curl:
+            return "File upload failed, {}\n".format(result["failure"])
+        else:
+            return render_template("failure.html", message=result["failure"])
+
+
+@app.route('/success', methods=['POST'])
+def success():
+    if request.method == 'POST':
+        source = request.values['source']
+        return upload_post(source)
+
+
 @app.route('/get')
 def get():
     try:
@@ -105,14 +143,14 @@ def query_variables(args):
 
 def http_debug_level(level):
     http.client.HTTPConnection.debuglevel = level
-    logging.getLogger().setLevel(logging.DEBUG)
+    # logging.getLogger().setLevel(logging.DEBUG)
     requests_log = logging.getLogger("requests.packages.urllib3")
     requests_log.setLevel(logging.DEBUG)
     requests_log.propagate = True
 
 
 def main():
-    FORMAT = '%(asctime)s : %(message)s'
+    FORMAT = '%(asctime)s [%(levelname)s] : %(message)s'
     logging.basicConfig(format=FORMAT, level=logging.INFO)
     http_debug_level(1)
     logging.info("Starting")

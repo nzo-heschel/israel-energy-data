@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>upload the file : GFG</title>
+</head>
+<body>
+<form id = "upload-file" action = "/success" method = "post" enctype="multipart/form-data">
+    <label for="source">Source:</label>
+    <select id="source" name="source">
+        <option value="noga">noga</option>
+    </select>
+    <br>
+    <input type="file" name="file" required />
+    <input type="submit" value="Upload" onclick="this.form.submit();this.disabled = true;">
+</form>
+
+
+</body>
+</html>
