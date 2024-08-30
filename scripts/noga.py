@@ -9,6 +9,7 @@ import os
 import datetime
 from dateutil.relativedelta import relativedelta
 from urllib.error import HTTPError
+import noga_labels
 
 noga_file_url = 'https://www.noga-iso.co.il/Umbraco/Surface/Export/ExportCost/' \
                 '?startDateString={}&endDateString={}&culture=en-US&dataType={}'
@@ -49,6 +50,11 @@ def update(store, noga_type, start_date, end_date):
         ns_start_date = start_date or store.latest_date(namespace) or NOGA2_TYPE_MAPPING.get(a_type).start_date
         json_list = request_file(a_type, ns_start_date, end_date)
         result[namespace] = json_list
+    count = store_results(store, result)
+    return "Inserted {} values into storage".format(count)
+
+
+def store_results(store, result):
     values = []
     count = 0
     total_count = 0
@@ -72,7 +78,36 @@ def update(store, noga_type, start_date, end_date):
     if values:
         store.bulk_insert(values)
     logging.info("Inserted %s values into storage", total_count)
-    return "Inserted {} values into storage".format(total_count)
+    return total_count
+
+
+def upload(store, f):
+    # Only supports uploading files with titles in Hebrew
+    xl_file = tempfile.NamedTemporaryFile()
+    try:
+        logging.debug("Saving file %s locally as %s", f.filename, xl_file.name)
+        f.save(xl_file.name)
+        logging.debug("Reading local file %s", xl_file.name)
+        df = pd.read_excel(xl_file.name, header=1)
+        logging.debug("Done reading local file %s", xl_file.name)
+        labels = df.columns.values.tolist()
+        logging.info("Labels in file: %s", labels)
+        namespace, new_labels = noga_labels.new_labels(labels)
+        logging.info("Namespace for %s is %s", f.filename, namespace)
+        df.columns = new_labels  # rename columns
+        if isinstance(df['Time'][1], datetime.time):
+            df['Time'] = df['Time'].apply(lambda x: str(x))
+        if isinstance(df['Date'][1], datetime.datetime):
+            df['Date'] = df['Date'].apply(lambda x: x.strftime('%d-%m-%Y'))
+    except ValueError as ve:
+        logging.error("Error: " + str(ve))
+        return {"failure": str(ve)}
+    finally:
+        xl_file.close()
+    json_list = df_to_json(df)
+    result = {namespace: json_list}
+    count = store_results(store, result)
+    return {"success": True, "count": count}
 
 
 def get(store, source, noga_type, start_date, end_date, tag, time="hour"):
@@ -171,6 +206,10 @@ def get_data_from_file(url):
         finally:
             xl_file.close()
 
+    return df_to_json(df)
+
+
+def df_to_json(df):
     labels = df.columns.values.tolist()
     logging.info("Labels: %s", labels)
     df.drop(columns=[label for label in labels if label[:7] == "Unnamed"], inplace=True)
