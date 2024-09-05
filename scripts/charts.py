@@ -9,6 +9,7 @@ import logging
 from dash import Dash, dcc, html, Input, Output
 import plotly.graph_objects as go
 import calendar
+import pandas as pd
 
 from scripts import noga
 
@@ -23,9 +24,28 @@ cached_data = None
 last_call = datetime.fromtimestamp(0)  # epoch
 last_max_year = 2050
 
-YEAR_URL = "http://0.0.0.0:9999/get?source=noga&type=cost&start_date=01-01-2021&end_date=31-12-2050&time=month"
+YEAR_URL = "http://129.159.130.194:8080/get?source=noga&type=cost&start_date=01-01-2021&end_date=31-12-2050&time=month"
+HEATMAP_URL = 'http://129.159.130.194:8080/get?source=noga2&type=energy&start_date=01-01-2024&time=all'
 
 MAIN_GRAPH_ID = "main-graph"
+YEAR_RANGE_SLIDER = "year-range-slider"
+HEATMAP_ID = "heatmap-graph"
+SOURCES_ID = "sources-checklist"
+
+GOLD_RED_COLORSCALE = [
+    [0, 'beige'],
+    [0.1, 'gold'],
+    [0.5, 'orange'],
+    [0.8, 'red'],
+    [1, 'darkred']
+]
+
+BLUE_RED_COLORSCALE = [
+    [0, "rgb(69, 117, 180)"],
+    [0.3, "rgb(172, 217, 233)"],
+    [0.65, "rgb(253, 175,97)"],
+    [1, 'rgb(215, 50, 40)']
+]
 
 bar_4 = (
     {"conv": "#667788", "ren": "#00a060"},
@@ -41,6 +61,11 @@ bar_color = {}
 for yr in range(YEAR_FROM, YEAR_TO):
     bar_color[yr] = bar_4[yr % 4]
 
+dfs = {}
+dfs_heatmap = None
+dfs_zero = None
+sources = []
+
 
 def legend(yr, total, total_renewable=None):
     return '{:.0f}: {:.2f} TWh ({:.2f}%)'.format(
@@ -53,19 +78,14 @@ def log_year(yr, renewables, total):
                  .format(yr, renewables / 1e3, total / 1e3, renewables / total * 100))
 
 
-def retrieve_data():
-    global cached_data, last_call, last_max_year
-    time_since_last_call = datetime.now() - last_call
-    if time_since_last_call.total_seconds() < 3600:
-        logging.info("Time since last call: {} seconds. No URL call.".format(int(time_since_last_call.total_seconds())))
-        return cached_data, last_max_year
+def retrieve_url(url):
     response = None
     retry = 1
     while True:
         retry += 1
         try:
-            logging.info("Executing URL call")
-            response = urlopen(YEAR_URL).read().decode('utf-8')
+            logging.info("Executing URL call: " + url)
+            response = urlopen(url).read().decode('utf-8')
             break
         except (HTTPError, URLError) as ex:
             logging.warning("Exception while trying to get data: " + str(ex))
@@ -73,13 +93,42 @@ def retrieve_data():
             time.sleep(2)
     if not response:
         logging.error("Could not get data from server")
-        exit(1)
-    json_list = json.loads(response)
+        return None
+    return json.loads(response)
+
+
+def retrieve_data():
+    global cached_data, last_call, last_max_year, dfs_zero, sources, dfs
+    time_since_last_call = datetime.now() - last_call
+    if time_since_last_call.total_seconds() < 3600:
+        logging.info("Time since last call: {} seconds. No URL call.".format(int(time_since_last_call.total_seconds())))
+        return cached_data, last_max_year
+    json_list = retrieve_url(YEAR_URL)
     cost_data_all = dict(sorted(json_list["noga.cost"].items(), key=lambda d: datetime.strptime(d[0], "%d-%m-%Y")))
     max_year = int(max(map(lambda date: date[6:], cost_data_all.keys())))
     cached_data = cost_data_all
     last_call = datetime.now()
     last_max_year = max_year
+
+    json_list2 = retrieve_url(HEATMAP_URL)
+    e = dict(sorted(json_list2["noga2.energy"].items(), key=lambda d: datetime.strptime(d[0], "%d-%m-%Y")))
+    d2 = {}
+    for _date, time_dict in e.items():
+        date = datetime.strptime(_date, "%d-%m-%Y")
+        for time, sources_dict in time_dict.items():
+            for source, value in sources_dict.items():
+                d2.setdefault(source, {}).setdefault(date, {})[time] = value
+    dfs = {}
+    for source, date_dict in d2.items():
+        print(source)
+        df = pd.DataFrame(date_dict).fillna(0)
+        df.index.name = "Time"
+        df.columns.name = "Date"
+        df = df.reindex(sorted(df.columns), axis=1).sort_index()
+        dfs[source] = df
+    dfs_zero = pd.DataFrame(0, index=dfs["Pv"].index, columns=dfs["Pv"].columns)
+    sources = [s for s in list(d2.keys()) if s not in ["Actualdemand", "DemandManagement", "Renewables"]]
+
     return cost_data_all, max_year
 
 
@@ -159,9 +208,13 @@ def layout():
                 step=1,
                 value=[YEAR_FROM, last_max_year],
                 marks={yr: str(yr) for yr in range(YEAR_FROM, last_max_year + 1)},
-                id='year-range-slider'),
+                id=YEAR_RANGE_SLIDER),
             ],
             style={'width': '50%', 'padding-left': '15%', 'display': 'inline-block'}),
+        dcc.Graph(
+            id=HEATMAP_ID,
+        ),
+        dcc.RadioItems(options=sources, value="Pv", id=SOURCES_ID, inline=True, style={'textAlign': 'center'})
     ])
     return _layout
 
@@ -179,11 +232,30 @@ def main():
 
 @dash_app.callback(
     Output(MAIN_GRAPH_ID, 'figure'),
-    Input('year-range-slider', 'value'),
+    Input(YEAR_RANGE_SLIDER, 'value'),
 )
 def update_output(range_from_slider):
     response, max_year = retrieve_data()
     fig = bar_chart(response, max_year, range_from_slider)
+    return fig
+
+
+@dash_app.callback(
+    Output(HEATMAP_ID, 'figure'),
+    Input(SOURCES_ID, 'value')
+)
+def update_heatmap_output(source):
+    retrieve_data()
+    print(source)
+    dfs_heatmap = dfs[source]
+    fig = go.Figure(
+        data=go.Heatmap(
+            x=dfs_heatmap.columns.values,
+            y=dfs_heatmap.index,
+            z=dfs_heatmap,
+            colorscale=BLUE_RED_COLORSCALE
+        )
+    )
     return fig
 
 
