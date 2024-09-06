@@ -8,6 +8,8 @@ import logging
 
 from dash import Dash, dcc, html, Input, Output
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+
 import calendar
 import pandas as pd
 
@@ -24,8 +26,8 @@ cached_data = None
 last_call = datetime.fromtimestamp(0)  # epoch
 last_max_year = 2050
 
-YEAR_URL = "http://129.159.130.194:8080/get?source=noga&type=cost&start_date=01-01-2021&end_date=31-12-2050&time=month"
-HEATMAP_URL = 'http://129.159.130.194:8080/get?source=noga2&type=energy&start_date=01-01-2024&time=all'
+YEAR_URL = "http://0.0.0.0:9999/get?source=noga&type=cost&start_date=01-01-2021&end_date=31-12-2050&time=month"
+HEATMAP_URL = 'http://0.0.0.0:9999/get?source=noga2&type=energy&start_date=01-01-2024&time=all'
 
 MAIN_GRAPH_ID = "main-graph"
 YEAR_RANGE_SLIDER = "year-range-slider"
@@ -117,10 +119,10 @@ def retrieve_data():
         date = datetime.strptime(_date, "%d-%m-%Y")
         for time, sources_dict in time_dict.items():
             for source, value in sources_dict.items():
-                d2.setdefault(source, {}).setdefault(date, {})[time] = value
+                s = "Diesel" if source == "Solar" else source
+                d2.setdefault(s, {}).setdefault(date, {})[time] = value
     dfs = {}
     for source, date_dict in d2.items():
-        print(source)
         df = pd.DataFrame(date_dict).fillna(0)
         df.index.name = "Time"
         df.columns.name = "Date"
@@ -214,7 +216,12 @@ def layout():
         dcc.Graph(
             id=HEATMAP_ID,
         ),
-        dcc.RadioItems(options=sources, value="Pv", id=SOURCES_ID, inline=True, style={'textAlign': 'center'})
+        dcc.RadioItems(
+            id=SOURCES_ID,
+            options=sources,
+            value="Pv",
+            inline=True,
+            style={'textAlign': 'center', 'fontSize': 20})
     ])
     return _layout
 
@@ -245,17 +252,35 @@ def update_output(range_from_slider):
     Input(SOURCES_ID, 'value')
 )
 def update_heatmap_output(source):
-    retrieve_data()
-    print(source)
+    # retrieve_data()
     dfs_heatmap = dfs[source]
-    fig = go.Figure(
-        data=go.Heatmap(
+    n_y = len(dfs_heatmap.index) / 4
+    fig = make_subplots(rows=2, cols=1, row_heights=[100, 600], vertical_spacing=0.05)
+    fig.add_trace(
+        go.Scatter(
+            x=dfs_heatmap.columns.values,
+            y=dfs_heatmap.sum() / 12,
+            hovertemplate='<i>%{x} : %{y:,.2f} MWh</i><extra></extra>'
+
+        ),
+        row=1, col=1),
+    fig.add_trace(
+        go.Heatmap(
             x=dfs_heatmap.columns.values,
             y=dfs_heatmap.index,
             z=dfs_heatmap,
-            colorscale=BLUE_RED_COLORSCALE
-        )
-    )
+            colorscale=BLUE_RED_COLORSCALE,
+            colorbar={'len': 0.8, 'y': 0.4},
+            hovertemplate='<i>%{x} %{y}</i><br>%{z:,.2f} MW<extra></extra>'
+        ),
+        row=2, col=1)
+    fig.update_xaxes(showticklabels=False, row=1, col=1)
+    fig.update_yaxes(title_text="MWh", col=1, row=1)
+    fig.update_yaxes(
+        tickvals=[0, n_y - 1, n_y * 2 - 1, n_y * 3 - 1, n_y * 4 - 1],
+        ticktext=['00:00', '06:00', '12:00', '18:00', '24:00'],
+        row=2, col=1)
+    fig.update_layout(height=800)
     return fig
 
 
