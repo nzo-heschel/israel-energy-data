@@ -1,8 +1,15 @@
-NS_SMP = "noga2.smp"
-NS_CO2 = "noga2.co2emission"
+SMP = "smp"
+CO2_EMISSION = "co2emission"
+SYSTEM_DEMAND = "system_demand"
+ENERGY = "energy"
+
+NOGA2 = "noga2."
+
+NS_SMP = NOGA2 + SMP
+NS_CO2 = NOGA2 + CO2_EMISSION
 NS_FORECAST2 = "noga2.forecast2"
-NS_SYSTEM_DEMAND = "noga2.system_demand"
-NS_ENERGY = "noga2.energy"
+NS_SYSTEM_DEMAND = NOGA2 + SYSTEM_DEMAND
+NS_ENERGY = NOGA2 + ENERGY
 NS_PRODUCER = "noga2.producer"
 NS_RESERVE = "noga2.reserve"
 NS_MARKET = "noga2.market"
@@ -24,6 +31,7 @@ LABELS_UNIQUE_KEY = {
     "עלות ₪/MW": NS_COST,
 }
 
+# TODO: These labels now appear in two places. Make them constants.
 NS_LABEL_MAP_HEB2ENG = {
     NS_SMP: (
         "Date", "Time",
@@ -76,6 +84,51 @@ for namespace, d in NS_LABEL_MAP_HEB2ENG.items():
     if isinstance(d, dict):
         d["תאריך"] = "Date"
         d["שעה"] = "Time"
+
+# Mapping of noga POST response labels to tags
+
+NS_LABEL_POST_MAP = {
+    "smp": {
+        "real_Time_Constrained_Smp": "Real Time Pricing Constrained SMP",
+        "real_Time_Unconstrained_Smp": "Real Time Pricing Unconstrained SMP",
+        "day_Ahead_Constrained_Smp": "Pre Booking Price Constrained SMP",
+        "day_Ahead_Unconstrained_Smp": "Pre Booking Price Unconstrained SMP"
+    },
+    "energy": {  # production mix
+        "coal": "Coal",
+        "natural_Gas": "Gas",
+        "soler": "Solar",
+        "mazut": "Mazut",
+        "pumped_Storage": "PSP",
+        "other": "Other",
+        "photoVoltaic": "PV",
+        "termo_Soler": "Thermo",
+        "wind": "Wind",
+        "bio_Gas": "Bio Gas",
+        "actual_Demand": "Actual Demand"
+    },
+    "system_demand": {
+        "demandHead": "Demand Ahead",
+        "demandUpdated": "Demand Updated",
+        "demandCurrent": "Demand Current"
+
+    },
+    "co2emission": {
+        "co2_coal": "Coal",
+        "co2_gas": "Gas",
+        "co2_diesel": "Gasoil",
+        "co2_mazut": "Fueloil",
+        "co2_methanol": "Methanol",
+        "co2_from_all_sites": "Co2 From All Sites Without Renewables",
+        "co2_renewables": "Renewables",
+        "co2_current_demand": "Co2 Current Demand",
+        "co2_ratio": "Co2 Ratio"
+    },
+}
+
+for namespace, d in NS_LABEL_POST_MAP.items():
+    d["date"] = "Date"
+    d["time"] = "Time"
 
 
 def new_labels(labels):
