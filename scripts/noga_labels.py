@@ -59,7 +59,7 @@ NS_LABEL_MAP_HEB2ENG = {
         "פחם": "Coal", "גז": "Gas", "סולר": "Solar", "מזוט": "Mazut", "אגירה שאובה": "PSP",
         "אחר": "Other", "פוטו-וולטאי": "PV", "תרמו סולארי": "Thermo", "רוח": "Wind",
         "ביוגז": "Bio Gas", "ניהול הביקוש": "Demand Management",
-        'סה"כ מתחדשות': "Renewables", "ייצור משקי בפועל": "Actualdemand",
+        'סה"כ מתחדשות': "Renewables", "ייצור משקי בפועל": "Actual Demand",
         "פוטו וולטאי משולב אגירה": "PV With Storage"
     },
     NS_PRODUCER: {
