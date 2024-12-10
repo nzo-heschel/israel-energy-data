@@ -35,10 +35,10 @@ LABELS_UNIQUE_KEY = {
 NS_LABEL_MAP_HEB2ENG = {
     NS_SMP: (
         "Date", "Time",
+        "Pre Booking Price Constrained SMP",
+        "Pre Booking Price Unconstrained SMP",
         "Real Time Pricing Constrained SMP",
         "Real Time Pricing Unconstrained SMP",
-        "Pre Booking Price Constrained SMP",
-        "Pre Booking Price Unconstrained SMP"
     ),
     NS_CO2: {
         "פחם": "Coal", "סולר": "Gasoil",  "גז": "Gas", "מזוט": "Fueloil",
