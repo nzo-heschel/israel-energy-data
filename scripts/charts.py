@@ -251,6 +251,7 @@ def update_output(range_from_slider):
     Input(SOURCES_ID, 'value')
 )
 def update_heatmap_output(source):
+    logging.info("Update heatmap: " + source)
     # retrieve_data()
     dfs_heatmap = dfs[source]
     n_y = len(dfs_heatmap.index) / 4
