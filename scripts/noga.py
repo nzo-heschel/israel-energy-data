@@ -1,6 +1,6 @@
+import json
 import logging
 import tempfile
-import time
 import urllib.request
 import pandas as pd
 import re
@@ -8,11 +8,9 @@ import urllib.request
 import os
 import datetime
 from dateutil.relativedelta import relativedelta
-from urllib.error import HTTPError
 import noga_labels
+import noga_tokens
 
-noga_file_url = 'https://www.noga-iso.co.il/Umbraco/Surface/Export/ExportCost/' \
-                '?startDateString={}&endDateString={}&culture=en-US&dataType={}'
 SMP_CONST = "ConstrainedSmp"
 SMP_UNCONST = "UnconstrainedSmp"
 
@@ -25,19 +23,17 @@ COST_DEMAND = "SystemDemand"
 FORECAST_REN = "Renewable"
 FORECAST_DEMAND = "SystemDemand"
 
-FIRST_DATE = "01-01-2010"
-MAX_DAYS_PER_REQUEST = 10
-
 proxies = {
     'https': os.environ.get('PROXY_SERVER'),
 }
 
 
 class NogaType:
-    def __init__(self, data_type, start_date="01-01-2020", chunk_size=30):
-        self.data_type = data_type
+    def __init__(self, path, token, start_date="01-01-2020", dict_key=None):
+        self.path = path
+        self.token = token
         self.start_date = start_date
-        self.chunk_size = chunk_size
+        self.dict_key = dict_key
 
 
 def update(store, noga_type, start_date, end_date):
@@ -48,7 +44,7 @@ def update(store, noga_type, start_date, end_date):
     for a_type in noga2_types:
         namespace = "noga2." + a_type
         ns_start_date = start_date or store.latest_date(namespace) or NOGA2_TYPE_MAPPING.get(a_type).start_date
-        json_list = request_file(a_type, ns_start_date, end_date)
+        json_list = request_data(a_type, ns_start_date, end_date)
         result[namespace] = json_list
     count = store_results(store, result)
     return "Inserted {} values into storage".format(count)
@@ -130,16 +126,10 @@ def one_month_ago():
 
 
 NOGA2_TYPE_MAPPING = {
-    'smp': NogaType('SMP', "27-12-2021"),
-    'cost': NogaType('Cost', "15-12-2021"),
-    'forecast1': NogaType('DemandForecast&forecastType=1', "26-10-2021"),
-    'forecast2': NogaType('DemandForecast&forecastType=2', "25-10-2021"),
-    'market': NogaType('DemandForecastNEW&forecastCategory=1', "27-12-2022"),
-    'producer': NogaType('DemandForecastNEW&forecastCategory=2', "27-12-2022"),
-    'reserve': NogaType('DemandForecastNEW&forecastCategory=3', "27-12-2022"),
-    'energy': NogaType('DemandForecastNEW&forecastCategory=6', "05-03-2023", 5),
-    'system_demand': NogaType('DemandForcastCurveGraph', "27-12-2022", 5),
-    'co2emission': NogaType('CO2', "23-03-2023"),
+    noga_labels.SMP: NogaType('SMP/SMPAPI/v1', noga_tokens.SMP_TOKEN, "27-12-2021"),
+    noga_labels.ENERGY: NogaType('PRODUCTIONMIX/PRODMIXAPI/v1', noga_tokens.PRODMIX_TOKEN, "05-03-2023", "energy"),
+    noga_labels.SYSTEM_DEMAND: NogaType('DEMAND/DEMANDAPI/v1', noga_tokens.DEMAND_TOKEN, "27-12-2022"),
+    noga_labels.CO2_EMISSION: NogaType('CO2/CO2API/v1', noga_tokens.CO2_TOKEN, "23-03-2023", "co2"),
 }
 
 
@@ -151,62 +141,47 @@ def date_str(date_ordinal):
     return datetime.datetime.fromordinal(date_ordinal).strftime("%d/%m/%Y")
 
 
-def daterange(from_date, to_date, step):
-    from_date_ordinal = date_ordinal(from_date)
-    to_date_ordinal = date_ordinal(to_date)
-    for start_ordinal in range(from_date_ordinal, to_date_ordinal + 1, step + 1):
-        end_ordinal = min(start_ordinal + step, to_date_ordinal)
-        yield [date_str(start_ordinal), date_str(end_ordinal)]
+def extract_values_from_post_response(jsons, mapping):
+    values = []
+    for day_item in jsons:
+        date = day_item['date']
+        time_items = day_item[list(day_item.keys())[1]]
+        for time_item in time_items:
+            value = {'Date': date}
+            for k, v in time_item.items():
+                value[camel_no_unit(mapping[k])] = v
+            values.append(value)
+    return values
 
 
-def request_file(noga_type, start_date, end_date):
+def request_data(noga_type, start_date, end_date):
     data_type = NOGA2_TYPE_MAPPING.get(noga_type)
-    logging.info("Request noga2.%s data from %s to %s in chunks of %s days",
-                 noga_type, start_date, end_date, data_type.chunk_size)
+    logging.info("Request noga2.%s data from %s to %s using HTTP POST",
+                 noga_type, start_date, end_date)
     if data_type is None:
         return {"error": "Unrecognized Noga type"}
-    start_date = start_date.replace("-", "/")
-    end_date = end_date.replace("-", "/")
-    json_list_all = []
-    for start_date_1, end_date_1 in daterange(start_date, end_date, data_type.chunk_size):
-        url = noga_file_url.format(start_date_1, end_date_1, data_type.data_type)
-        logging.info(url)
-        json_list = get_data_from_file(url)
-        logging.info("Received %s values for noga2.%s", len(json_list), noga_type)
-        json_list_all.extend(json_list)
-    logging.info("Received total %s values for noga2.%s", len(json_list_all), noga_type)
-    return json_list_all
+    jsons = noga_post(data_type.path, start_date, end_date, data_type.token)
+    jsons = jsons[data_type.dict_key] if data_type.dict_key else jsons
+    label_mapping = noga_labels.NS_LABEL_POST_MAP[noga_type]
+    json_list = extract_values_from_post_response(jsons, label_mapping)
+    logging.info("Received %s values for noga2.%s", len(json_list), noga_type)
+    return json_list
 
 
-def get_data_from_file(url):
-    retry = 1
-    while retry:
-        xl_file = tempfile.NamedTemporaryFile()
-        try:
-            urllib.request.urlretrieve(url, xl_file.name)
-            df = pd.read_excel(xl_file.name, header=1)
-            retry = 0
-        except ValueError as ve:
-            if len(ve.args) == 1 and \
-                    ve.args[0] == 'Excel file format cannot be determined, you must specify an engine manually.':
-                return []
-            else:
-                raise ve
-        except HTTPError as httpe:
-            if httpe.getcode() == 403:
-                logging.error(httpe)
-                if retry < 4:
-                    logging.info("SLEEPING")
-                    time.sleep(10)
-                    retry += 1
-                    continue
-            raise httpe
-        except Exception as ex:
-            raise ex
-        finally:
-            xl_file.close()
+POST_URL = "https://apim-api.noga-iso.co.il/"
 
-    return df_to_json(df)
+
+def noga_post(path, from_date, to_date, token):
+    hdr = {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache',
+        'Ocp-Apim-Subscription-Key': noga_tokens.decrypt_token(token, noga_tokens.NOGA_KEY)
+    }
+    data = json.dumps({"fromDate": from_date, "toDate": to_date})
+    req = urllib.request.Request(POST_URL + path, headers=hdr, data=bytes(data.encode("utf-8")))
+    req.get_method = lambda: 'POST'
+    response = urllib.request.urlopen(req)
+    return json.loads(response.read().decode("utf-8"))
 
 
 def df_to_json(df):
