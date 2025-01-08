@@ -2,6 +2,7 @@ import datetime
 import json
 import logging
 import os
+
 from dateutil.relativedelta import relativedelta
 import http.client
 import scripts.noga as noga
@@ -15,7 +16,6 @@ STORAGE_URI = os.environ.get('STORAGE_URI', "mysql://root:mysql_root_123@localho
 store = storage.new_instance(STORAGE_URI)
 
 app = Flask(__name__, template_folder='../resources')
-
 
 @app.route('/')
 def index():
@@ -145,15 +145,13 @@ def http_debug_level(level):
     http.client.HTTPConnection.debuglevel = level
     # logging.getLogger().setLevel(logging.DEBUG)
     requests_log = logging.getLogger("requests.packages.urllib3")
-    requests_log.setLevel(logging.DEBUG)
+    requests_log.setLevel(logging.INFO)
     requests_log.propagate = True
 
 
 def main():
-    FORMAT = '%(asctime)s [%(levelname)s] : %(message)s'
-    logging.basicConfig(format=FORMAT, level=logging.INFO)
-    http_debug_level(1)
-    logging.info("Starting")
+    http_debug_level(0)
+    logging.info("Starting server")
     from waitress import serve
     serve(app, host="0.0.0.0", port=PORT)
 
