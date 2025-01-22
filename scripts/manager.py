@@ -13,7 +13,7 @@ logging.basicConfig(format=FORMAT, level=logging.INFO)
 def log_memory_usage():
     total_mb = psutil.virtual_memory().total / 1024 / 1024
     used_mb = psutil.virtual_memory().used / 1024 / 1024
-    pct = used_mb / total_mb
+    pct = used_mb / total_mb * 100
     logging.info(f"Memory usage: {total_mb:,.0f} MB total, {used_mb:,.0f} MB used ({pct:.2f}%)")
 
 
