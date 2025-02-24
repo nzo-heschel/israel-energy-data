@@ -226,9 +226,7 @@ def layout():
 
 
 def main():
-    FORMAT = '%(asctime)s : %(message)s'
-    logging.basicConfig(format=FORMAT, level=logging.INFO)
-    logging.info("Starting")
+    logging.info("Starting charts")
     retrieve_data()
     # Using a reference to the function (not a function call) makes the graph
     # reload (using fresh data from the server) on page refresh.
