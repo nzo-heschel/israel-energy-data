@@ -105,7 +105,9 @@ NS_LABEL_POST_MAP = {
         "termo_Soler": "Thermo",
         "wind": "Wind",
         "bio_Gas": "Bio Gas",
-        "actual_Demand": "Actual Demand"
+        "actual_Demand": "Actual Demand",
+        "photovoltaicIntegrated": "PV With Storage",
+        "renewableSum": "Renewable Sum"
     },
     "system_demand": {
         "demandHead": "Demand Ahead",
