@@ -99,7 +99,7 @@ NS_LABEL_POST_MAP = {
         "natural_Gas": "Gas",
         "soler": "Solar",
         "mazut": "Mazut",
-        "pumped_Storage": "PSP",
+        "storage": "PSP",
         "other": "Other",
         "photoVoltaic": "PV",
         "termo_Soler": "Thermo",
