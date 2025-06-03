@@ -4,7 +4,6 @@ import tempfile
 import urllib.request
 import pandas as pd
 import re
-import urllib.request
 import os
 import datetime
 from dateutil.relativedelta import relativedelta

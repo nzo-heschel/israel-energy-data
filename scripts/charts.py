@@ -1,6 +1,7 @@
 import json
 from datetime import datetime
 from urllib.error import HTTPError, URLError
+import msgpack
 
 import time
 from urllib.request import urlopen
@@ -27,7 +28,7 @@ last_call = datetime.fromtimestamp(0)  # epoch
 last_max_year = 2050
 
 YEAR_URL = "http://0.0.0.0:9999/get?source=noga&type=cost&start_date=01-01-2021&end_date=31-12-2050&time=month"
-HEATMAP_URL = 'http://0.0.0.0:9999/get?source=noga2&type=energy&start_date=01-01-2024&time=all'
+HEATMAP_URL = 'http://0.0.0.0:9999/get?source=noga2&type=energy&start_date=01-01-2024&time=all&format=bin'
 
 MAIN_GRAPH_ID = "main-graph"
 YEAR_RANGE_SLIDER = "year-range-slider"
@@ -81,22 +82,28 @@ def log_year(yr, renewables, total):
 
 
 def retrieve_url(url):
-    response = None
+    result = None
     retry = 1
     while True:
         retry += 1
         try:
             logging.info("Executing URL call: " + url)
-            response = urlopen(url).read().decode('utf-8')
+            with urlopen(url) as response:
+                content_type = response.info().get('Content-Type', '')
+                if content_type == "application/x-msgpack":
+                    result = msgpack.unpackb(response.read(), raw=False)
+                else:
+                    data = response.read().decode('utf-8')
+                    result = json.loads(data)
             break
         except (HTTPError, URLError) as ex:
             logging.warning("Exception while trying to get data: " + str(ex))
             logging.warning("Retry #{} in 2 seconds".format(retry))
             time.sleep(2)
-    if not response:
+    if not result:
         logging.error("Could not get data from server")
         return None
-    return json.loads(response)
+    return result
 
 
 def retrieve_data():

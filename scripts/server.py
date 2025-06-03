@@ -5,6 +5,7 @@ import os
 
 from dateutil.relativedelta import relativedelta
 import http.client
+import msgpack
 import scripts.noga as noga
 import scripts.storage.storage_util as storage
 from flask import Flask, render_template, request
@@ -102,6 +103,12 @@ def format_data(data, result_format):
                 response=json_to_df(data).to_csv(index=False, sep="\t"),
                 status=200,
                 mimetype='text/plain'
+            )
+        case "bin":
+            return app.response_class(
+                response=msgpack.packb(data, use_bin_type=True),
+                status=200,
+                mimetype='application/x-msgpack'
             )
     # default format: json
     return app.response_class(

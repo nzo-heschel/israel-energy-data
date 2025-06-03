@@ -18,7 +18,7 @@ def log_memory_usage():
 
 
 def shcedule_mem_usage():
-    interval = 600
+    interval = 60
     log_memory_usage()
     logging.info("Scheduling mem usage thread every %s seconds", interval)
     ischedule.schedule(log_memory_usage, interval=interval)
