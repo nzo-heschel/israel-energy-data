@@ -1,0 +1,3 @@
+# my-cron
+# Update the DB every night at 01:00
+0 1 * * * root /scripts/update.sh >> /var/log/my-cron.log 2>&1
