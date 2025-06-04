@@ -13,6 +13,12 @@ hdr = {
     'Ocp-Apim-Subscription-Key': <TOKEN>
 }
 
+and payload (for example):
+
+{
+    "fromDate": "04-03-2025",
+    "toDate": "04-03-2025"
+}
 =================
 These URLs are used on the website (mentioned here for documentation purposes only):
 
