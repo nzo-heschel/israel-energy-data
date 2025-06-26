@@ -36,18 +36,59 @@ class NogaType:
 
 
 def update(store, noga_type, start_date, end_date):
-    # Update old noga url (namespace noga.*) is no longer supported, only noga2.* with file API is supported.
-    noga2_types = NOGA2_TYPE_MAPPING if noga_type == "all" else [noga_type] if noga_type else NOGA2_TYPE_MAPPING
-    # TODO: error handling wrong noga_type
-    result = {}
+    """
+    Collects data from NOGA API endpoints and stores it in the database.
+    Handles individual endpoint failures to prevent data loss and ensure
+    continuation of data collection for other endpoints.
+
+    Args:
+        store: Db where to store the results
+        noga_type (str): The specific NOGA2 type to fetch, or "all" for all types.
+        start_date (str): The start date for data collection (YYYY-MM-DD format).
+        end_date (str): The end date for data collection (YYYY-MM-DD format).
+
+    Returns:
+        str: A message indicating the total number of values inserted into storage.
+    """
+    noga2_types = NOGA2_TYPE_MAPPING if noga_type == "all" else ([noga_type] if noga_type else list(NOGA2_TYPE_MAPPING.keys()))
+
+    total_inserted_count = 0
+    failed_endpoints_details = {}
+
     for a_type in noga2_types:
         namespace = "noga2." + a_type
-        ns_start_date = start_date or store.latest_date(namespace) or NOGA2_TYPE_MAPPING.get(a_type).start_date
-        json_list = request_data(a_type, ns_start_date, end_date)
-        result[namespace] = json_list
-    count = store_results(store, result)
-    return "Inserted {} values into storage".format(count)
+        ns_start_date = start_date or store.latest_date(namespace) or NOGA2_TYPE_MAPPING.get(a_type, {}).get("start_date")
 
+        if not ns_start_date:
+            logging.warning(f"Skipping {namespace}: Could not determine a start date for data collection.")
+            failed_endpoints_details[namespace] = "Could not determine a start date"
+            continue
+
+        try:
+            logging.info(f"Attempting to request data for {namespace} from {ns_start_date} to {end_date}")
+            json_list = request_data(a_type, ns_start_date, end_date)
+            # Store results immediately after successful collection for this endpoint
+            if json_list:
+                current_endpoint_results = {namespace: json_list}
+                count = store_results(store, current_endpoint_results)
+                total_inserted_count += count
+                logging.info(f"Successfully inserted {count} values for {namespace}.")
+            else:
+                logging.info(f"No new data found for {namespace} in the specified range.")
+                failed_endpoints_details[namespace] = "No new data"
+
+        except Exception as e:
+            # Log the error but continue with the next endpoint
+            logging.error(f"Failed to collect data for endpoint '{namespace}': {e}", exc_info=True)
+            failed_endpoints_details[namespace] = str(e)
+            # Data for this specific endpoint is lost, but previous successful collections are preserved
+            # and subsequent collections will still be attempted.
+
+    return_message = f"Inserted {total_inserted_count} values into storage."
+    if failed_endpoints_details:
+        for namespace, reason in failed_endpoints_details.items():
+            return_message += f"\n{namespace} failed with reason '{reason}'."
+    return return_message
 
 def store_results(store, result):
     values = []
