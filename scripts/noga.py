@@ -54,6 +54,7 @@ def update(store, noga_type, start_date, end_date):
 
     total_inserted_count = 0
     failed_endpoints_details = {}
+    all_new_keys = {}
 
     for a_type in noga2_types:
         namespace = "noga2." + a_type
@@ -66,7 +67,7 @@ def update(store, noga_type, start_date, end_date):
 
         try:
             logging.info(f"Attempting to request data for {namespace} from {ns_start_date} to {end_date}")
-            json_list = request_data(a_type, ns_start_date, end_date)
+            json_list, new_keys = request_data(a_type, ns_start_date, end_date)
             # Store results immediately after successful collection for this endpoint
             if json_list:
                 current_endpoint_results = {namespace: json_list}
@@ -76,6 +77,8 @@ def update(store, noga_type, start_date, end_date):
             else:
                 logging.info(f"No new data found for {namespace} in the specified range.")
                 failed_endpoints_details[namespace] = "No new data"
+            if new_keys:
+                all_new_keys[namespace] = new_keys
 
         except Exception as e:
             # Log the error but continue with the next endpoint
@@ -88,6 +91,8 @@ def update(store, noga_type, start_date, end_date):
     if failed_endpoints_details:
         for namespace, reason in failed_endpoints_details.items():
             return_message += f"\n{namespace} failed with reason '{reason}'."
+    if all_new_keys:
+        return_message += f"\nNew keys: {all_new_keys}."
     return return_message
 
 def store_results(store, result):
@@ -183,16 +188,24 @@ def date_str(date_ordinal):
 
 def extract_values_from_post_response(jsons, mapping):
     values = []
+    new_keys_logged = set()
     for day_item in jsons:
         date = day_item['date']
-        time_items = day_item[list(day_item.keys())[1]]
+        time_items_key = next(k for k in day_item if k != 'date')
+        time_items = day_item[time_items_key]
         for time_item in time_items:
             value = {'Date': date}
             for k, v in time_item.items():
-                value[camel_no_unit(mapping[k])] = v
+                try:
+                    mapped_key = mapping[k]
+                    value[camel_no_unit(mapped_key)] = v
+                except KeyError:
+                    if k not in new_keys_logged:
+                        logging.error("New key '%s' in noga2 response", k)
+                        new_keys_logged.add(k)
+                    continue
             values.append(value)
-    return values
-
+    return values, new_keys_logged
 
 def request_data(noga_type, start_date, end_date):
     data_type = NOGA2_TYPE_MAPPING.get(noga_type)
@@ -203,9 +216,9 @@ def request_data(noga_type, start_date, end_date):
     jsons = noga_post(data_type.path, start_date, end_date, data_type.token)
     jsons = jsons[data_type.dict_key] if data_type.dict_key else jsons
     label_mapping = noga_labels.NS_LABEL_POST_MAP[noga_type]
-    json_list = extract_values_from_post_response(jsons, label_mapping)
+    json_list, new_keys = extract_values_from_post_response(jsons, label_mapping)
     logging.info("Received %s values for noga2.%s", len(json_list), noga_type)
-    return json_list
+    return json_list, new_keys
 
 
 POST_URL = "https://apim-api.noga-iso.co.il/"
