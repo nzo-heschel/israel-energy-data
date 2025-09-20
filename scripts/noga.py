@@ -106,7 +106,8 @@ def store_results(store, result):
             time = entry.get("Time")
             for tag in [key for key in entry.keys()
                         if key not in ["Date", "Time", "FileDate", "IsOnBlobList"] and entry.get(key) != "-"]:
-                val = re.sub(r'[^0-9.]', '', str(entry.get(tag)).strip())
+                match = re.match(r'-?[0-9.]+', str(entry.get(tag)).strip())
+                val = match.group(0)
                 if val == '':
                     continue
                 values.append((namespace, date, time[0:5], tag, val))
