@@ -7,7 +7,8 @@ import time
 from urllib.request import urlopen
 import logging
 
-from dash import Dash, dcc, html, Input, Output
+from dash import Dash, dcc, html, callback_context, Input, Output
+from dash.exceptions import PreventUpdate
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
@@ -34,6 +35,8 @@ MAIN_GRAPH_ID = "main-graph"
 YEAR_RANGE_SLIDER = "year-range-slider"
 HEATMAP_ID = "heatmap-graph"
 SOURCES_ID = "sources-checklist"
+FREEZE_SCALE_ID = "freeze_scale"
+FREEZE_SCALE_VALUE = "Freeze Scale"
 
 GOLD_RED_COLORSCALE = [
     [0, 'beige'],
@@ -69,6 +72,9 @@ dfs_heatmap = None
 dfs_zero = None
 sources = []
 
+global_zmin = 0
+global_zmax = 1
+global_freeze_source = None # The source for which the scale is frozen
 
 def legend(yr, total, total_renewable=None):
     return '{:.0f}: {:.2f} TWh ({:.2f}%)'.format(
@@ -221,13 +227,28 @@ def layout():
             style={'width': '50%', 'padding-left': '15%', 'display': 'inline-block'}),
         dcc.Graph(
             id=HEATMAP_ID,
+            style={'marginBottom': '0px'}
+        ),
+        html.Div([
+            dcc.Checklist(id=FREEZE_SCALE_ID, options=[FREEZE_SCALE_VALUE], value=[])
+        ],
+            style={
+                'display': 'flex',
+                'justifyContent': 'flex-end',
+                'width': '100%',
+                'marginRight': '20px',
+                'marginTop': '-50px',  # Overlap the heatmap graph
+                'marginBottom': '50px',
+                'position': 'relative',
+                'zIndex': '10'
+            }
         ),
         dcc.RadioItems(
             id=SOURCES_ID,
             options=sources,
             value="Pv",
             inline=True,
-            style={'textAlign': 'center', 'fontSize': 20})
+            style={'textAlign': 'center', 'fontSize': 20, 'marginTop': '0px'}),
     ])
     return _layout
 
@@ -238,7 +259,7 @@ def main():
     # Using a reference to the function (not a function call) makes the graph
     # reload (using fresh data from the server) on page refresh.
     dash_app.layout = layout
-    dash_app.run_server(debug=False, host='0.0.0.0', port=9998)
+    dash_app.run(debug=False, host='0.0.0.0', port=9998)
 
 
 @dash_app.callback(
@@ -253,11 +274,24 @@ def update_output(range_from_slider):
 
 @dash_app.callback(
     Output(HEATMAP_ID, 'figure'),
-    Input(SOURCES_ID, 'value')
+    [Input(SOURCES_ID, 'value'),
+     Input(FREEZE_SCALE_ID, 'value')]
 )
-def update_heatmap_output(source):
-    logging.info("Update heatmap: " + source)
-    # retrieve_data()
+def update_heatmap_output(source, freeze_scale_value):
+    global dfs, global_zmin, global_zmax, global_freeze_source
+
+    freeze_checked = FREEZE_SCALE_VALUE in freeze_scale_value
+    triggered_id = callback_context.triggered[0]['prop_id'].split('.')[0]
+    if triggered_id == FREEZE_SCALE_ID:
+        if freeze_checked: # When freezing the scale, no need to update the figure
+            global_freeze_source = source # Keep track for which source the scale was frozen
+            raise PreventUpdate
+        else: # Freeze scale is unchecked
+            if source == global_freeze_source: # If source is the same as the one when scale was frozen then no update
+                raise PreventUpdate
+
+    logging.info(f"Update heatmap: {source}"
+                 f"{'' if FREEZE_SCALE_VALUE not in freeze_scale_value else (' (' + FREEZE_SCALE_VALUE + ')')}")
     dfs_heatmap = dfs[source]
     n_y = len(dfs_heatmap.index) / 4
     fig = make_subplots(rows=2, cols=1, row_heights=[100, 600], vertical_spacing=0.05)
@@ -266,15 +300,22 @@ def update_heatmap_output(source):
             x=dfs_heatmap.columns.values,
             y=dfs_heatmap.sum() / 12,
             hovertemplate='<i>%{x} : %{y:,.2f} MWh</i><extra></extra>'
-
         ),
         row=1, col=1),
+
+    if not freeze_checked:
+        global_zmin = dfs_heatmap.min().min()
+        global_zmax = dfs_heatmap.max().max()
+
+
     fig.add_trace(
         go.Heatmap(
             x=dfs_heatmap.columns.values,
             y=dfs_heatmap.index,
             z=dfs_heatmap,
             colorscale=BLUE_RED_COLORSCALE,
+            zmin=global_zmin,
+            zmax=global_zmax,
             colorbar={'len': 0.8, 'y': 0.4},
             hovertemplate='<i>%{x} %{y}</i><br>%{z:,.2f} MW<extra></extra>'
         ),
