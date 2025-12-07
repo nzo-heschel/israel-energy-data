@@ -2,7 +2,7 @@ import json
 from datetime import datetime
 from urllib.error import HTTPError, URLError
 import msgpack
-
+import os
 import time
 from urllib.request import urlopen
 import logging
@@ -22,7 +22,10 @@ from scripts import noga
 # months_list = calendar.month_name[1:]
 months_list = calendar.month_abbr[1:]
 
-dash_app = Dash(__name__)
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ASSETS_PATH = os.path.join(ROOT_DIR, 'assets')
+dash_app = Dash(__name__, assets_folder=ASSETS_PATH)
+
 year_range = None
 cached_data = None
 last_call = datetime.fromtimestamp(0)  # epoch
@@ -228,7 +231,19 @@ nav_links = html.Div([
 def home_layout():
     return html.Div([
         nav_links,
-        html.H1("NZO אתר הנתונים של", style={'textAlign': 'center'}),
+        html.H1("אתר הנתונים של", style={'textAlign': 'center'}),
+        html.Img(
+            src=dash_app.get_asset_url('logo.png'), # Change 'logo.png' to your file name
+            style={
+                'height': '80px',
+                'width': 'auto',
+                'display': 'block', # Ensures the image takes up its own line
+                'margin-left': 'auto',
+                'margin-right': 'auto',
+                'margin-top': '20px',
+                'margin-bottom': '20px',
+            }
+        ),
         html.P("בחרו גרף מהרשימה בראש הדף", style={'textAlign': 'center'})
     ])
 
