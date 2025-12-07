@@ -38,6 +38,9 @@ SOURCES_ID = "sources-checklist"
 FREEZE_SCALE_ID = "freeze_scale"
 FREEZE_SCALE_VALUE = "Freeze Scale"
 
+PATH_BAR_CHART = '/bar-chart'
+PATH_HEATMAP = '/heatmap'
+
 GOLD_RED_COLORSCALE = [
     [0, 'beige'],
     [0.1, 'gold'],
@@ -213,20 +216,20 @@ def per_year_stacked_bar(cost_data, group):
 
 
 nav_links = html.Div([
-    dcc.Link('Home', href='/'),
+    dcc.Link('דף הבית', href='/'),
     html.Span(' | '),
-    dcc.Link('Yearly Bar Chart', href='/bar-chart'),
+    dcc.Link('אנרגיות מתחדשות', href=PATH_BAR_CHART),
     html.Span(' | '),
-    dcc.Link('Daily Heatmap', href='/heatmap'),
+    dcc.Link('תמהיל הייצור', href=PATH_HEATMAP),
     html.Hr()
-], style={'padding': '10px'})
+], style={'padding': '10px', 'textAlign': 'right'})
 
 
 def home_layout():
     return html.Div([
         nav_links,
-        html.H1("Energy Charts Dashboard", style={'textAlign': 'center'}),
-        html.P("Welcome to the energy data visualization dashboard. Please select a chart above to view the data.", style={'textAlign': 'center'})
+        html.H1("NZO אתר הנתונים של", style={'textAlign': 'center'}),
+        html.P("בחרו גרף מהרשימה בראש הדף", style={'textAlign': 'center'})
     ])
 
 # --- Bar Chart Page Layout ---
@@ -338,9 +341,9 @@ def main():
 @dash_app.callback(Output('page-content', 'children'),
                    [Input('url', 'pathname')])
 def display_page(pathname):
-    if pathname == '/bar-chart':
+    if pathname == PATH_BAR_CHART:
         return bar_chart_layout()
-    elif pathname == '/heatmap':
+    elif pathname == PATH_HEATMAP:
         return heatmap_layout()
     else:
         # Default to home page for '/' or any unrecognized path
