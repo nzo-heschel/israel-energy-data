@@ -289,47 +289,6 @@ def app_layout():
     ])
 
 
-def layout():
-    global last_max_year
-    _layout = html.Div([
-        dcc.Graph(id=MAIN_GRAPH_ID, config={'displayModeBar': False}),
-        html.Div([
-            dcc.RangeSlider(
-                YEAR_FROM, last_max_year,
-                step=1,
-                value=[YEAR_FROM, last_max_year],
-                marks={yr: str(yr) for yr in range(YEAR_FROM, last_max_year + 1)},
-                id=YEAR_RANGE_SLIDER),
-            ],
-            style={'width': '50%', 'padding-left': '15%', 'display': 'inline-block'}),
-        dcc.Graph(
-            id=HEATMAP_ID,
-            style={'marginBottom': '0px'}
-        ),
-        html.Div([
-            dcc.Checklist(id=FREEZE_SCALE_ID, options=[FREEZE_SCALE_VALUE], value=[])
-        ],
-            style={
-                'display': 'flex',
-                'justifyContent': 'flex-end',
-                'width': '100%',
-                'marginRight': '20px',
-                'marginTop': '-50px',  # Overlap the heatmap graph
-                'marginBottom': '50px',
-                'position': 'relative',
-                'zIndex': '10'
-            }
-        ),
-        dcc.RadioItems(
-            id=SOURCES_ID,
-            options=sources,
-            value="Pv",
-            inline=True,
-            style={'textAlign': 'center', 'fontSize': 20, 'marginTop': '0px'}),
-    ])
-    return _layout
-
-
 def main():
     logging.info("Starting charts")
     retrieve_data()
@@ -389,7 +348,7 @@ def update_heatmap_output(source, freeze_scale_value):
             y=dfs_heatmap.sum() / 12,
             hovertemplate='<i>%{x} : %{y:,.2f} MWh</i><extra></extra>'
         ),
-        row=1, col=1),
+        row=1, col=1)
 
     if not freeze_checked:
         global_zmin = dfs_heatmap.min().min()
@@ -414,7 +373,15 @@ def update_heatmap_output(source, freeze_scale_value):
         tickvals=[0, n_y - 1, n_y * 2 - 1, n_y * 3 - 1, n_y * 4 - 1],
         ticktext=['00:00', '06:00', '12:00', '18:00', '24:00'],
         row=2, col=1)
-    fig.update_layout(height=800)
+    fig.update_layout(height=800,
+                      title=go.layout.Title(
+                          x=0.5,
+                          xanchor='center',
+                          font={"family": "Hebrew", "size": 36},
+                          text='תמהיל הייצור'
+                      ),
+    )
+
     return fig
 
 
