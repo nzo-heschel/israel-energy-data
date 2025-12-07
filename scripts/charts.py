@@ -212,6 +212,80 @@ def per_year_stacked_bar(cost_data, group):
     return trace_ren, trace_conv, total, total_renewable
 
 
+nav_links = html.Div([
+    dcc.Link('Home', href='/'),
+    html.Span(' | '),
+    dcc.Link('Yearly Bar Chart', href='/bar-chart'),
+    html.Span(' | '),
+    dcc.Link('Daily Heatmap', href='/heatmap'),
+    html.Hr()
+], style={'padding': '10px'})
+
+
+def home_layout():
+    return html.Div([
+        nav_links,
+        html.H1("Energy Charts Dashboard", style={'textAlign': 'center'}),
+        html.P("Welcome to the energy data visualization dashboard. Please select a chart above to view the data.", style={'textAlign': 'center'})
+    ])
+
+# --- Bar Chart Page Layout ---
+def bar_chart_layout():
+    global last_max_year
+    return html.Div([
+        nav_links,
+        dcc.Graph(id=MAIN_GRAPH_ID, config={'displayModeBar': False}),
+        html.Div([
+            dcc.RangeSlider(
+                YEAR_FROM, last_max_year,
+                step=1,
+                value=[YEAR_FROM, last_max_year],
+                marks={yr: str(yr) for yr in range(YEAR_FROM, last_max_year + 1)},
+                id=YEAR_RANGE_SLIDER),
+        ],
+            style={'width': '50%', 'padding-left': '15%', 'display': 'inline-block'}),
+    ])
+
+# --- Heatmap Page Layout ---
+def heatmap_layout():
+    return html.Div([
+        nav_links,
+        dcc.Graph(
+            id=HEATMAP_ID,
+            style={'marginBottom': '0px'}
+        ),
+        html.Div([
+            dcc.Checklist(id=FREEZE_SCALE_ID, options=[FREEZE_SCALE_VALUE], value=[])
+        ],
+            style={
+                'display': 'flex',
+                'justifyContent': 'flex-end',
+                'width': '100%',
+                'marginRight': '20px',
+                'marginTop': '-50px',
+                'marginBottom': '50px',
+                'position': 'relative',
+                'zIndex': '10'
+            }
+        ),
+        dcc.RadioItems(
+            id=SOURCES_ID,
+            options=sources,
+            value="Pv",
+            inline=True,
+            style={'textAlign': 'center', 'fontSize': 20, 'marginTop': '0px'}),
+    ])
+
+
+# --- New Top-Level Application Layout ---
+def app_layout():
+    # This is the single layout structure Dash requires for routing
+    return html.Div([
+        dcc.Location(id='url', refresh=False),
+        html.Div(id='page-content')
+    ])
+
+
 def layout():
     global last_max_year
     _layout = html.Div([
@@ -256,10 +330,21 @@ def layout():
 def main():
     logging.info("Starting charts")
     retrieve_data()
-    # Using a reference to the function (not a function call) makes the graph
-    # reload (using fresh data from the server) on page refresh.
-    dash_app.layout = layout
+    # Use the new top-level layout function for routing
+    dash_app.layout = app_layout
     dash_app.run(debug=False, host='0.0.0.0', port=9998)
+
+
+@dash_app.callback(Output('page-content', 'children'),
+                   [Input('url', 'pathname')])
+def display_page(pathname):
+    if pathname == '/bar-chart':
+        return bar_chart_layout()
+    elif pathname == '/heatmap':
+        return heatmap_layout()
+    else:
+        # Default to home page for '/' or any unrecognized path
+        return home_layout()
 
 
 @dash_app.callback(
