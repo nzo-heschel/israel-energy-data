@@ -1,41 +1,26 @@
-import json
 from datetime import datetime
-from urllib.error import HTTPError, URLError
-import msgpack
 import os
-import time
-from urllib.request import urlopen
 import logging
+import utils
 
 from dash import Dash, dcc, html, callback_context, Input, Output
 from dash.exceptions import PreventUpdate
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-import calendar
 import pandas as pd
 
-from scripts import noga
-
-# import locale
-# locale.setlocale(locale.LC_ALL, 'he_IL')
-# months_list = calendar.month_name[1:]
-months_list = calendar.month_abbr[1:]
+from pages.home import home_layout
+# from pages.heatmap import heatmap_layout
+import pages.bar_chart as bar_chart
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ASSETS_PATH = os.path.join(ROOT_DIR, 'assets')
 dash_app = Dash(__name__, assets_folder=ASSETS_PATH)
+LOGO_URL = dash_app.get_asset_url('logo.png')
 
-year_range = None
-cached_data = None
-last_call = datetime.fromtimestamp(0)  # epoch
-last_max_year = 2050
-
-YEAR_URL = "http://0.0.0.0:9999/get?source=noga&type=cost&start_date=01-01-2021&end_date=31-12-2050&time=month"
 HEATMAP_URL = 'http://0.0.0.0:9999/get?source=noga2&type=energy&start_date=01-01-2024&time=all&format=bin'
 
-MAIN_GRAPH_ID = "main-graph"
-YEAR_RANGE_SLIDER = "year-range-slider"
 HEATMAP_ID = "heatmap-graph"
 SOURCES_ID = "sources-checklist"
 FREEZE_SCALE_ID = "freeze_scale"
@@ -59,19 +44,6 @@ BLUE_RED_COLORSCALE = [
     [1, 'rgb(215, 50, 40)']
 ]
 
-bar_4 = (
-    {"conv": "#667788", "ren": "#00a060"},
-    {"conv": "#a9a9a9", "ren": "#30d030"},
-    {"conv": "#778899", "ren": "#00a020"},
-    {"conv": "#808080", "ren": "#008000"},
-)
-
-YEAR_FROM: int = 2021
-YEAR_TO: int = 2051  # excluding
-
-bar_color = {}
-for yr in range(YEAR_FROM, YEAR_TO):
-    bar_color[yr] = bar_4[yr % 4]
 
 dfs = {}
 dfs_heatmap = None
@@ -93,45 +65,12 @@ def log_year(yr, renewables, total):
                  .format(yr, renewables / 1e3, total / 1e3, renewables / total * 100))
 
 
-def retrieve_url(url):
-    result = None
-    retry = 1
-    while True:
-        retry += 1
-        try:
-            logging.info("Executing URL call: " + url)
-            with urlopen(url) as response:
-                content_type = response.info().get('Content-Type', '')
-                if content_type == "application/x-msgpack":
-                    result = msgpack.unpackb(response.read(), raw=False)
-                else:
-                    data = response.read().decode('utf-8')
-                    result = json.loads(data)
-            break
-        except (HTTPError, URLError) as ex:
-            logging.warning("Exception while trying to get data: " + str(ex))
-            logging.warning("Retry #{} in 2 seconds".format(retry))
-            time.sleep(2)
-    if not result:
-        logging.error("Could not get data from server")
-        return None
-    return result
-
 
 def retrieve_data():
     global cached_data, last_call, last_max_year, dfs_zero, sources, dfs
-    time_since_last_call = datetime.now() - last_call
-    if time_since_last_call.total_seconds() < 3600:
-        logging.info("Time since last call: {} seconds. No URL call.".format(int(time_since_last_call.total_seconds())))
-        return cached_data, last_max_year
-    json_list = retrieve_url(YEAR_URL)
-    cost_data_all = dict(sorted(json_list["noga.cost"].items(), key=lambda d: datetime.strptime(d[0], "%d-%m-%Y")))
-    max_year = int(max(map(lambda date: date[6:], cost_data_all.keys())))
-    cached_data = cost_data_all
-    last_call = datetime.now()
-    last_max_year = max_year
 
-    json_list2 = retrieve_url(HEATMAP_URL)
+
+    json_list2 = utils.retrieve_url(HEATMAP_URL)
     e = dict(sorted(json_list2["noga2.energy"].items(), key=lambda d: datetime.strptime(d[0], "%d-%m-%Y")))
     d2 = {}
     for _date, time_dict in e.items():
@@ -150,72 +89,9 @@ def retrieve_data():
     dfs_zero = pd.DataFrame(0, index=dfs["Pv"].index, columns=dfs["Pv"].columns)
     sources = [s for s in list(d2.keys()) if s not in ["Actualdemand", "DemandManagement", "Renewables"]]
 
-    return cost_data_all, max_year
+    return
 
 
-def bar_chart(cost_data_all, max_year, years_range):
-    cost_data, trace_renewable, trace_conventional, year_total, year_total_renewable = {}, {}, {}, {}, {}
-    traces = []
-    years = years_range or [YEAR_FROM, max_year]
-    for yr in range(YEAR_FROM, max_year + 1):
-        cost_data[yr] = per_yer_cost_data(cost_data_all, str(yr))
-        trace_renewable[yr], trace_conventional[yr], year_total[yr], year_total_renewable[yr] =\
-            per_year_stacked_bar(cost_data[yr], yr)
-        if years[0] <= yr <= years[1]:
-            traces.append(trace_conventional[yr])
-            traces.append(trace_renewable[yr])
-            log_year(yr, year_total_renewable[yr], year_total[yr])
-    fig = go.Figure(data=traces,
-                    layout=go.Layout(
-                        height=800,  # showlegend=False,
-                        xaxis=go.layout.XAxis(title="", fixedrange=True, tickfont={"size": 18}),
-                        yaxis=go.layout.YAxis(title={"text": '[MWh] ייצור', "font":{"size": 18}},
-                                              fixedrange=True,
-                                              tickfont={"size": 18},
-                                              tickformat=",.0r"),
-                        plot_bgcolor='snow',
-                        legend={"font": {"size": 16}},
-                        title=go.layout.Title(
-                            x=0.5,
-                            xanchor='center',
-                            font={"family": "Hebrew", "size": 36},
-                            text='ייצור חשמל בישראל'
-                        )))
-    fig.add_annotation(xref="paper", yref="paper", x=0, y=1, showarrow=False, text="מקור : נוגה", font={"size": 16})
-    return fig
-
-
-def per_yer_cost_data(data, yr):
-    return {key: value for key, value in data.items() if yr in key}
-
-
-def per_year_stacked_bar(cost_data, group):
-    total = 0
-    total_renewable = 0
-    y_renewable = []
-    y_conventional = []
-    y_text = []
-    for date in cost_data:
-        renewable = cost_data[date]['00:00'][noga.COST_REN] * 0.5 / 1000
-        conventional = cost_data[date]['00:00'][noga.COST_CONV] * 0.5 / 1000
-        total = total + renewable + conventional
-        total_renewable += renewable
-        y_renewable.append(renewable)
-        y_conventional.append(conventional)
-        y_text.append("{:.1%}".format(renewable / (renewable + conventional)))
-    trace_ren = go.Bar(x=months_list, y=y_renewable, text=y_text, textposition="auto", textfont={"size": 48},
-                       offsetgroup=group,
-                       name=legend(group, total / 1e3, total_renewable / 1e3), marker_color=bar_color[group]["ren"],
-                       legendgroup="ren",
-                       legendgrouptitle={"text": "  מתחדשות  ", "font": {"size": 20}},
-                       hovertemplate='<i>%{x} ' + str(group) + ' Renewable</i>:<br>      %{y:,.0f} MWh')
-    trace_conv = go.Bar(x=months_list, y=y_conventional,
-                        offsetgroup=group, base=y_renewable,
-                        name=legend(group, total / 1e3), marker_color=bar_color[group]["conv"],
-                        legendgroup="conv",
-                        legendgrouptitle={"text": "   סך הכל   ", "font": {"size": 20}},
-                        hovertemplate='<i>%{x} ' + str(group) + ' Total</i>:<br>      %{y:,.0f} MWh')
-    return trace_ren, trace_conv, total, total_renewable
 
 
 nav_links = html.Div([
@@ -228,41 +104,7 @@ nav_links = html.Div([
 ], style={'padding': '10px', 'textAlign': 'right'})
 
 
-def home_layout():
-    return html.Div([
-        nav_links,
-        html.H1("אתר הנתונים של", style={'textAlign': 'center'}),
-        html.Img(
-            src=dash_app.get_asset_url('logo.png'), # Change 'logo.png' to your file name
-            style={
-                'height': '80px',
-                'width': 'auto',
-                'display': 'block', # Ensures the image takes up its own line
-                'margin-left': 'auto',
-                'margin-right': 'auto',
-                'margin-top': '20px',
-                'margin-bottom': '20px',
-            }
-        ),
-        html.P("בחרו גרף מהרשימה בראש הדף", style={'textAlign': 'center'})
-    ])
 
-# --- Bar Chart Page Layout ---
-def bar_chart_layout():
-    global last_max_year
-    return html.Div([
-        nav_links,
-        dcc.Graph(id=MAIN_GRAPH_ID, config={'displayModeBar': False}),
-        html.Div([
-            dcc.RangeSlider(
-                YEAR_FROM, last_max_year,
-                step=1,
-                value=[YEAR_FROM, last_max_year],
-                marks={yr: str(yr) for yr in range(YEAR_FROM, last_max_year + 1)},
-                id=YEAR_RANGE_SLIDER),
-        ],
-            style={'width': '50%', 'padding-left': '15%', 'display': 'inline-block'}),
-    ])
 
 # --- Heatmap Page Layout ---
 def heatmap_layout():
@@ -307,6 +149,7 @@ def app_layout():
 def main():
     logging.info("Starting charts")
     retrieve_data()
+    bar_chart.retrieve_data()
     # Use the new top-level layout function for routing
     dash_app.layout = app_layout
     dash_app.run(debug=False, host='0.0.0.0', port=9998)
@@ -316,22 +159,12 @@ def main():
                    [Input('url', 'pathname')])
 def display_page(pathname):
     if pathname == PATH_BAR_CHART:
-        return bar_chart_layout()
+        return bar_chart.bar_chart_layout(nav_links)
     elif pathname == PATH_HEATMAP:
         return heatmap_layout()
     else:
         # Default to home page for '/' or any unrecognized path
-        return home_layout()
-
-
-@dash_app.callback(
-    Output(MAIN_GRAPH_ID, 'figure'),
-    Input(YEAR_RANGE_SLIDER, 'value'),
-)
-def update_output(range_from_slider):
-    response, max_year = retrieve_data()
-    fig = bar_chart(response, max_year, range_from_slider)
-    return fig
+        return home_layout(nav_links, LOGO_URL)
 
 
 @dash_app.callback(
@@ -399,6 +232,7 @@ def update_heatmap_output(source, freeze_scale_value):
 
     return fig
 
+bar_chart.register_bar_chart_callbacks(dash_app)
 
 if __name__ == "__main__":
     main()
