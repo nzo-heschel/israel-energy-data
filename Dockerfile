@@ -9,6 +9,7 @@ COPY requirements.txt ./requirements.txt
 RUN pip install -r requirements.txt
 
 # Copy application scripts and resources
+COPY ./assets ./assets
 COPY ./scripts ./scripts
 COPY ./resources/*.html ./resources/
 
