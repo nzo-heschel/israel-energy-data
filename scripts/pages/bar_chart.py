@@ -147,7 +147,7 @@ def retrieve_data():
     return cost_data_all, max_year
 
 
-def register_bar_chart_callbacks(app):
+def register_callbacks(app):
     @app.callback(
         Output(MAIN_GRAPH_ID, 'figure'),
         Input(YEAR_RANGE_SLIDER, 'value'),
