@@ -1,15 +1,16 @@
 from dash import dcc, html, Input, Output, callback_context
-from datetime import datetime
-import logging
-from scripts import utils
 from dash.exceptions import PreventUpdate
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+from datetime import datetime
+import logging
 import pandas as pd
+
+from scripts import utils
 
 HEATMAP_ID = "heatmap-graph"
 SOURCES_ID = "sources-checklist"
-FREEZE_SCALE_ID = "freeze_scale"
+FREEZE_SCALE_ID = "freeze-scale"
 FREEZE_SCALE_VALUE = "Freeze Scale"
 
 HEATMAP_URL = 'http://0.0.0.0:9999/get?source=noga2&type=energy&start_date=01-01-2024&time=all&format=bin'
@@ -104,7 +105,6 @@ def register_callbacks(app):
     )
     def update_heatmap_output(source, freeze_scale_value):
         global dfs, global_zmin, global_zmax, global_freeze_source
-        retrieve_data()
         freeze_checked = FREEZE_SCALE_VALUE in freeze_scale_value
         triggered_id = callback_context.triggered[0]['prop_id'].split('.')[0]
         if triggered_id == FREEZE_SCALE_ID:
@@ -114,9 +114,9 @@ def register_callbacks(app):
             else: # Freeze scale is unchecked
                 if source == global_freeze_source: # If source is the same as the one when scale was frozen then no update
                     raise PreventUpdate
-
+        retrieve_data()
         logging.info(f"Update heatmap: {source}"
-                     f"{'' if FREEZE_SCALE_VALUE not in freeze_scale_value else (' (' + FREEZE_SCALE_VALUE + ')')}")
+                     f"{(' (' + FREEZE_SCALE_VALUE + ')') if freeze_checked else ''}")
         dfs_heatmap = dfs[source]
         n_y = len(dfs_heatmap.index) / 4
         fig = make_subplots(rows=2, cols=1, row_heights=[100, 600], vertical_spacing=0.05)
@@ -131,7 +131,6 @@ def register_callbacks(app):
         if not freeze_checked:
             global_zmin = dfs_heatmap.min().min()
             global_zmax = dfs_heatmap.max().max()
-
 
         fig.add_trace(
             go.Heatmap(
@@ -151,13 +150,13 @@ def register_callbacks(app):
             tickvals=[0, n_y - 1, n_y * 2 - 1, n_y * 3 - 1, n_y * 4 - 1],
             ticktext=['00:00', '06:00', '12:00', '18:00', '24:00'],
             row=2, col=1)
-        fig.update_layout(height=800,
-                          title=go.layout.Title(
-                              x=0.5,
-                              xanchor='center',
-                              font={"family": "Hebrew", "size": 36},
-                              text='תמהיל הייצור'
-                          ),
-                          )
-
+        fig.update_layout(
+            height=800,
+            title=go.layout.Title(
+                x=0.5,
+                xanchor='center',
+                font={"family": "Hebrew", "size": 36},
+                text='תמהיל הייצור'
+            ),
+        )
         return fig
