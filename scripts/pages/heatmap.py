@@ -9,11 +9,12 @@ import pandas as pd
 from scripts import utils
 
 HEATMAP_ID = "heatmap-graph"
-SOURCES_ID = "sources-checklist"
+SOURCES_ID = "sources-radioitems"
 FREEZE_SCALE_ID = "freeze-scale"
 FREEZE_SCALE_VALUE = "Freeze Scale"
 
-HEATMAP_URL = 'http://0.0.0.0:9999/get?source=noga2&type=energy&start_date=01-01-2024&time=all&format=bin'
+select_source = "Pv"
+start_date = "01-01-2024"
 
 last_call = datetime.fromtimestamp(0)  # epoch
 
@@ -42,29 +43,34 @@ global_zmax = 1
 global_freeze_source = None # The source for which the scale is frozen
 
 def retrieve_data():
-    global last_call, dfs_zero, sources, dfs
+    global last_call, dfs_zero, sources, dfs, start_date
     time_since_last_call = datetime.now() - last_call
     if time_since_last_call.total_seconds() < 3600:
         logging.info("Time since last call: {} seconds. No URL call.".format(int(time_since_last_call.total_seconds())))
         return
 
-    json_list = utils.retrieve_url(HEATMAP_URL)
+    heatmap_url = f'http://0.0.0.0:9999/get?source=noga2&type=energy&start_date={start_date}&time=all&format=bin'
+    json_list = utils.retrieve_url(heatmap_url)
     e = dict(sorted(json_list["noga2.energy"].items(), key=lambda d: datetime.strptime(d[0], "%d-%m-%Y")))
     d2 = {}
+    date = None
     for _date, time_dict in e.items():
         date = datetime.strptime(_date, "%d-%m-%Y")
         for time, sources_dict in time_dict.items():
             for source, value in sources_dict.items():
                 s = "Diesel" if source == "Solar" else source
                 d2.setdefault(s, {}).setdefault(date, {})[time] = value
-    dfs = {}
+    start_date = date.strftime("%d-%m-%Y")
     for source, date_dict in d2.items():
         df = pd.DataFrame(date_dict).fillna(0)
         df.index.name = "Time"
         df.columns.name = "Date"
         df = df.reindex(sorted(df.columns), axis=1).sort_index()
-        dfs[source] = df
-    dfs_zero = pd.DataFrame(0, index=dfs["Pv"].index, columns=dfs["Pv"].columns)
+        if source in dfs:
+            dfs[source] = df.combine_first(dfs[source])
+        else:
+            dfs[source] = df
+    dfs_zero = pd.DataFrame(0, index=dfs[select_source].index, columns=dfs[select_source].columns)
     sources = [s for s in list(d2.keys()) if s not in ["Actualdemand", "DemandManagement", "Renewables"]]
     last_call = datetime.now()
 
@@ -92,7 +98,7 @@ def heatmap_layout(nav_links):
         dcc.RadioItems(
             id=SOURCES_ID,
             options=sources,
-            value="Pv",
+            value=select_source,
             inline=True,
             style={'textAlign': 'center', 'fontSize': 20, 'marginTop': '0px'}),
     ])
