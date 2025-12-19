@@ -125,7 +125,7 @@ def register_callbacks(app):
                      f"{(' (' + FREEZE_SCALE_VALUE + ')') if freeze_checked else ''}")
         dfs_heatmap = dfs[source]
         n_y = len(dfs_heatmap.index) / 4
-        fig = make_subplots(rows=2, cols=1, row_heights=[100, 600], vertical_spacing=0.05)
+        fig = make_subplots(rows=2, cols=1, row_heights=[100, 600],vertical_spacing=0.05, shared_xaxes=True)
         fig.add_trace(
             go.Scatter(
                 x=dfs_heatmap.columns.values,
