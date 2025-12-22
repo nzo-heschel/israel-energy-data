@@ -57,6 +57,11 @@ def retrieve_data():
     for _date, time_dict in e.items():
         date = datetime.strptime(_date, "%d-%m-%Y")
         for time, sources_dict in time_dict.items():
+            # Noga has spurious data on 03-07-2025,14:36 and 28-05-2024,12:18
+            if time == '12:18':
+                time = '12:15'  # No data for 12:15 so use 12:18 instead.
+            if time == '14:36':
+                continue  # There are points for 14:35 and 14:40, so just skip it.
             for source, value in sources_dict.items():
                 s = "Diesel" if source == "Solar" else source
                 d2.setdefault(s, {}).setdefault(date, {})[time] = value
