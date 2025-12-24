@@ -163,6 +163,7 @@ def register_callbacks(app):
             row=2, col=1)
         fig.update_layout(
             height=800,
+            uirevision=True,
             title=go.layout.Title(
                 x=0.5,
                 xanchor='center',
