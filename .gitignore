@@ -1,0 +1,8 @@
+__pycache__/
+.idea/
+sandbox/
+.env
+
+caddy_data/
+caddy_config/
+
