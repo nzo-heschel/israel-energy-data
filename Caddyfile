@@ -1,9 +1,9 @@
 # Charts on default HTTPS (443)
 data.nzo.org.il {
-    reverse_proxy python-app:8081
+    reverse_proxy nzo_d:9998
 }
 
 # API on port 8080
 data.nzo.org.il:8080 {
-    reverse_proxy python-app:8080
+    reverse_proxy nzo_d:9999
 }
