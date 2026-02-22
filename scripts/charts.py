@@ -1,7 +1,7 @@
 import os
 import logging
 from dash import Dash, dcc, html, Input, Output
-from pages import home, bar_chart, heatmap
+from pages import home, bar_chart, heatmap, storage
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ASSETS_PATH = os.path.join(ROOT_DIR, 'assets')
@@ -10,6 +10,7 @@ LOGO_URL = dash_app.get_asset_url('logo.png')
 
 PATH_BAR_CHART = '/bar-chart'
 PATH_HEATMAP = '/heatmap'
+PATH_STORAGE = '/storage'
 
 nav_links = html.Div([
     dcc.Link('דף הבית', href='/'),
@@ -17,6 +18,8 @@ nav_links = html.Div([
     dcc.Link('אנרגיות מתחדשות', href=PATH_BAR_CHART),
     html.Span(' | '),
     dcc.Link('תמהיל הייצור', href=PATH_HEATMAP),
+    html.Span(' | '),
+    dcc.Link('אגירה', href=PATH_STORAGE),
     html.Hr()
 ], style={'padding': '10px', 'textAlign': 'right'})
 
@@ -47,6 +50,8 @@ def display_page(pathname):
         return bar_chart.bar_chart_layout(nav_links)
     elif pathname == PATH_HEATMAP:
         return heatmap.heatmap_layout(nav_links)
+    elif pathname == PATH_STORAGE:
+        return storage.storage_layout(nav_links)
     else:
         # Default to home page for '/' or any unrecognized path
         return home.home_layout(nav_links, LOGO_URL)
@@ -54,6 +59,7 @@ def display_page(pathname):
 
 bar_chart.register_callbacks(dash_app)
 heatmap.register_callbacks(dash_app)
+storage.register_callbacks(dash_app)
 
 if __name__ == "__main__":
     main()
