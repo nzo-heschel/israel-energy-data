@@ -22,10 +22,17 @@ BTN_YEAR_ID = "btn-last-year"
 XY_START_TIME = datetime(1900, 1, 1, 0, 0)
 XY_END_TIME = datetime(1900, 1, 2, 0, 0)
 
+VALUE_BATTERIES = 'BatteriesNet'
+VALUE_PSP = 'PspNet'
+VALUE_XY_GRAPH = 'xy'
+
+COLOR_DISCHARGE = 'green'
+COLOR_CHARGE = 'red'
+
 # Global variables to store state
 last_start_date = None
 last_end_date = None
-last_source = 'BatteriesNet'
+last_source = VALUE_BATTERIES
 
 def get_date_range_bounds():
     # Helper to get min/max allowed dates based on data
@@ -109,15 +116,15 @@ def storage_layout(nav_links):
                 dcc.RadioItems(
                     id=STORAGE_SOURCE_ID,
                     options=[
-                        {'label': 'אגירה בסוללות', 'value': 'BatteriesNet'},
-                        {'label': 'אגירה שאובה', 'value': 'PspNet'}
+                        {'label': 'אגירה בסוללות', 'value': VALUE_BATTERIES},
+                        {'label': 'אגירה שאובה', 'value': VALUE_PSP}
                     ],
                     value=last_source,
                     style={'marginTop': '20px', 'fontSize': 20}
                 ),
                 dcc.Checklist(
                     id=GRAPH_TYPE_ID,
-                    options=[{'label': 'גרף מלבני', 'value': 'xy'}],
+                    options=[{'label': 'גרף מלבני', 'value': VALUE_XY_GRAPH}],
                     value=[],
                     style={'marginTop': '20px', 'fontSize': 18}
                 )
@@ -198,7 +205,7 @@ def register_callbacks(app):
         last_end_date = end_date
         last_source = source
         
-        is_xy = 'xy' in (graph_type or [])
+        is_xy = VALUE_XY_GRAPH in (graph_type or [])
         
         # Ensure data is available (refresh if needed, handled by retrieve_data logic)
         heatmap.retrieve_data()
@@ -331,7 +338,7 @@ def register_callbacks(app):
             y=daily_max_discharge.values,
             mode='lines+markers',
             name='Max Discharge',
-            line=dict(color='green'),
+            line=dict(color=COLOR_DISCHARGE),
             hovertemplate='Date: %{x}<br>Max Discharge: %{y:,.2f} MW<extra></extra>'
         ))
         
@@ -340,7 +347,7 @@ def register_callbacks(app):
             y=-daily_max_charge.values, # Negate to show as positive
             mode='lines+markers',
             name='Max Charge',
-            line=dict(color='red'),
+            line=dict(color=COLOR_CHARGE),
             hovertemplate='Date: %{x}<br>Max Charge: %{y:,.2f} MW<extra></extra>'
         ))
         
@@ -350,7 +357,7 @@ def register_callbacks(app):
             y=daily_energy_discharge.values,
             mode='lines+markers',
             name='Energy Discharge',
-            line=dict(color='green'),
+            line=dict(color=COLOR_DISCHARGE),
             hovertemplate='Date: %{x}<br>Energy Discharge: %{y:,.2f} MWh<extra></extra>'
         ))
         
@@ -359,7 +366,7 @@ def register_callbacks(app):
             y=-daily_energy_charge.values, # Negate to show as positive
             mode='lines+markers',
             name='Energy Charge',
-            line=dict(color='red'),
+            line=dict(color=COLOR_CHARGE),
             hovertemplate='Date: %{x}<br>Energy Charge: %{y:,.2f} MWh<extra></extra>'
         ))
 
@@ -371,7 +378,7 @@ def register_callbacks(app):
             html.P(f'נצילות: {efficiency:.2%}', style={'fontSize': '20px'})
         ])
 
-        title_text = 'אגירה בסוללות' if source == 'BatteriesNet' else 'אגירה שאובה'
+        title_text = 'אגירה בסוללות' if source == VALUE_BATTERIES else 'אגירה שאובה'
 
         # Main Figure Layout
         if is_xy:
