@@ -7,8 +7,9 @@ import re
 import os
 import datetime
 from dateutil.relativedelta import relativedelta
-import noga_labels
-import noga_tokens
+import scripts.noga_labels as noga_labels
+import scripts.noga_tokens as noga_tokens
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 SMP_CONST = "ConstrainedSmp"
 SMP_UNCONST = "UnconstrainedSmp"
@@ -56,14 +57,13 @@ def update(store, noga_type, start_date, end_date):
     failed_endpoints_details = {}
     all_new_keys = {}
 
-    for a_type in noga2_types:
+    def process_type(a_type):
         namespace = "noga2." + a_type
-        ns_start_date = start_date or store.latest_date(namespace) or NOGA2_TYPE_MAPPING.get(a_type, {}).get("start_date")
+        ns_start_date = start_date or store.latest_date(namespace) or NOGA2_TYPE_MAPPING.get(a_type).start_date
 
         if not ns_start_date:
             logging.warning(f"Skipping {namespace}: Could not determine a start date for data collection.")
-            failed_endpoints_details[namespace] = "Could not determine a start date"
-            continue
+            return 0, {namespace: "Could not determine a start date"}, {}
 
         try:
             logging.info(f"Attempting to request data for {namespace} from {ns_start_date} to {end_date}")
@@ -72,20 +72,24 @@ def update(store, noga_type, start_date, end_date):
             if json_list:
                 current_endpoint_results = {namespace: json_list}
                 count = store_results(store, current_endpoint_results)
-                total_inserted_count += count
                 logging.info(f"Successfully inserted {count} values for {namespace}.")
+                return count, {}, {namespace: new_keys} if new_keys else {}
             else:
                 logging.info(f"No new data found for {namespace} in the specified range.")
-                failed_endpoints_details[namespace] = "No new data"
-            if new_keys:
-                all_new_keys[namespace] = new_keys
+                return 0, {namespace: "No new data"}, {}
 
         except Exception as e:
             # Log the error but continue with the next endpoint
             logging.error(f"Failed to collect data for endpoint '{namespace}': {e}", exc_info=True)
-            failed_endpoints_details[namespace] = str(e)
-            # Data for this specific endpoint is lost, but previous successful collections are preserved
-            # and subsequent collections will still be attempted.
+            return 0, {namespace: str(e)}, {}
+
+    with ThreadPoolExecutor(max_workers=len(noga2_types)) as executor:
+        future_to_type = {executor.submit(process_type, a_type): a_type for a_type in noga2_types}
+        for future in as_completed(future_to_type):
+            count, failed, new_keys = future.result()
+            total_inserted_count += count
+            failed_endpoints_details.update(failed)
+            all_new_keys.update(new_keys)
 
     return_message = f"Inserted {total_inserted_count} values into storage."
     if failed_endpoints_details:

@@ -160,7 +160,7 @@ def main():
     http_debug_level(0)
     logging.info("Starting server")
     from waitress import serve
-    serve(app, host="0.0.0.0", port=PORT)
+    serve(app, host="0.0.0.0", port=PORT, threads=8)
 
 
 if __name__ == "__main__":

@@ -1,8 +1,9 @@
+from contextlib import contextmanager
+
 from scripts.storage.storage_top import Storage, fix_date, unfix_date, unfix_time, dict_key_value
 
 
 class SqlStorageTemplate(Storage):
-
     SQL_CREATE_TABLE = "CREATE TABLE IF NOT EXISTS main_table " \
                        "(namespace VARCHAR(80), date DATE, time TIME, tag VARCHAR(50), value REAL, " \
                        "CONSTRAINT main_table_pk PRIMARY KEY (namespace, date, time, tag))"
@@ -33,23 +34,23 @@ class SqlStorageTemplate(Storage):
         self._execute_query("DROP TABLE main_table",
                             self.SQL_CREATE_TABLE)
 
-    def _get_db_cursor(self):
-        return self.db.cursor()
+    @contextmanager
+    def _managed_cursor(self, commit=False):
+        raise NotImplementedError
 
     def _get_records(self, query):
-        curr = self._get_db_cursor()
-        curr.execute(query)
-        records = curr.fetchall()
-        return records
+        with self._managed_cursor() as curr:
+            curr.execute(query)
+            records = curr.fetchall()
+            return records
 
     def _execute_query(self, *queries):
-        curr = self._get_db_cursor()
-        for query in queries:
-            curr.execute(query)
-        self.db.commit()
+        with self._managed_cursor(commit=True) as curr:
+            for query in queries:
+                curr.execute(query)
 
     def retrieve_value(self, namespace, date, time, tag):
-        records = self._get_records((self.SQL_RETRIEVE+self.SQL_AND_DATE+self.SQL_AND_TAG+self.SQL_AND_TIME)
+        records = self._get_records((self.SQL_RETRIEVE + self.SQL_AND_DATE + self.SQL_AND_TAG + self.SQL_AND_TIME)
                                     .format(namespace=namespace, date=fix_date(date), time=time, tag=tag))
         return records[0][-1] if records else None
 
@@ -113,5 +114,5 @@ class SqlStorageTemplate(Storage):
         return d
 
     def _fix(self, value):
-        return "('{}', date('{}'), time('{}'), '{}', {})"\
+        return "('{}', date('{}'), time('{}'), '{}', {})" \
             .format(value[0], fix_date(value[1]), value[2], value[3], value[4])
