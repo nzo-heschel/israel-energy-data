@@ -11,7 +11,7 @@ YEAR_RANGE_SLIDER = "year-range-slider"
 YEAR_FROM: int = 2021
 YEAR_TO: int = 2060  # excluding
 
-YEAR_URL = "http://0.0.0.0:9999/get?source=noga&type=cost&start_date=01-01-2021&end_date=31-12-2050&time=month"
+YEAR_URL = "http://0.0.0.0:9999/get?source=noga&type=cost&start_date=01-01-2021&end_date=31-12-2023&time=month"
 NEW_DATA_DEMAND_URL = "http://0.0.0.0:9999/get?source=noga2&type=energy&tag=ActualDemand&start_date=01-01-2024&time=month"
 NEW_DATA_REN_URL = "http://0.0.0.0:9999/get?source=noga2&type=energy&tag=RenewableSum&start_date=01-01-2024&time=month"
 
@@ -19,6 +19,7 @@ months_list = calendar.month_abbr[1:]
 
 year_range = None
 cached_data = None
+cached_year_data = None
 last_call = datetime.fromtimestamp(0)  # epoch
 last_max_year = 2050
 
@@ -30,7 +31,7 @@ bar_4 = (
 )
 
 def retrieve_data():
-    global cached_data, last_call, last_max_year
+    global cached_data, last_call, last_max_year, cached_year_data
     time_since_last_call = datetime.now() - last_call
     if time_since_last_call.total_seconds() < 3600 and cached_data is not None:
         logging.info("Time since last call: {} seconds. No URL call.".format(int(time_since_last_call.total_seconds())))
@@ -38,9 +39,14 @@ def retrieve_data():
     
     cost_data_all = {}
     
-    json_list = utils.retrieve_url(YEAR_URL)
-    if json_list:
-        cost_data_all.update(json_list["noga.cost"])
+    if cached_year_data is None:
+        # Old noga data is retrieved only once
+        json_list = utils.retrieve_url(YEAR_URL)
+        if json_list:
+            cached_year_data = json_list["noga.cost"]
+
+    if cached_year_data:
+        cost_data_all.update(cached_year_data)
 
     json_demand = utils.retrieve_url(NEW_DATA_DEMAND_URL)
     json_ren = utils.retrieve_url(NEW_DATA_REN_URL)
