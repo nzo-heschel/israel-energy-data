@@ -1,6 +1,7 @@
 from furl import furl
 from scripts.storage.sql_storage import SqlStorageTemplate
 import sqlite3
+from contextlib import contextmanager
 
 
 class InMemSqlStorage(SqlStorageTemplate):
@@ -22,5 +23,15 @@ class InMemSqlStorage(SqlStorageTemplate):
     def __init__(self, uri="sqlite://energy-data"):
         self.url = furl(uri)
         file_name = str(self.url.host)
-        self.db = sqlite3.connect(file_name)
+        self.db = sqlite3.connect(file_name, check_same_thread=False)
         self._execute_query(self.SQL_CREATE_TABLE)
+
+    @contextmanager
+    def _managed_cursor(self, commit=False):
+        cursor = self.db.cursor()
+        try:
+            yield cursor
+            if commit:
+                self.db.commit()
+        finally:
+            cursor.close()

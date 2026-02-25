@@ -1,11 +1,13 @@
+from contextlib import contextmanager
+
 from scripts.storage.sql_storage import SqlStorageTemplate
 from scripts.storage.storage_top import fix_date
 import psycopg2
+from psycopg2 import pool
 from furl import furl
 
 
 class PostgresStorage(SqlStorageTemplate):
-
     SQL_ON_CONFLICT = "ON CONFLICT ON CONSTRAINT main_table_pk DO UPDATE SET value = EXCLUDED.value"
     SQL_AND_DATE = " AND date = '{date}'"
     SQL_AND_DATE_RANGE = " AND date BETWEEN '{from_date}' AND '{to_date}'"
@@ -22,15 +24,27 @@ class PostgresStorage(SqlStorageTemplate):
 
     def __init__(self, uri):
         self.url = furl(uri)
-        self.db = self._init_connection()
+        self.pool = self._init_pool()
         self._execute_query(self.SQL_CREATE_TABLE)
 
-    def _init_connection(self):
+    def _init_pool(self):
         user = self.url.username
         password = self.url.password
         host = self.url.host
         port = self.url.port
-        return psycopg2.connect(user=user, password=password, host=host, port=port)
+        return psycopg2.pool.SimpleConnectionPool(1, 10, user=user, password=password, host=host, port=port)
+
+    @contextmanager
+    def _managed_cursor(self, commit=False):
+        conn = self.pool.getconn()
+        cursor = conn.cursor()
+        try:
+            yield cursor
+            if commit:
+                conn.commit()
+        finally:
+            cursor.close()
+            self.pool.putconn(conn)
 
     def bulk_insert(self, values):
         # in postgres we can't have duplicates in the same command.

@@ -1,14 +1,14 @@
-from scripts.storage.sql_storage import SqlStorageTemplate
-import mysql.connector
-from furl import furl
-import logging
+from contextlib import contextmanager
 
+from mysql.connector.pooling import MySQLConnectionPool
+
+from scripts.storage.sql_storage import SqlStorageTemplate
+from furl import furl
 
 energy_db_name = "energy_data"
 
 
 class MySqlStorage(SqlStorageTemplate):
-
     SQL_ON_CONFLICT = "as new_value ON DUPLICATE KEY UPDATE value=new_value.value"
     SQL_AND_DATE = " AND date = date('{date}')"
     SQL_AND_DATE_RANGE = " AND date BETWEEN date('{from_date}') AND date('{to_date}')"
@@ -25,25 +25,34 @@ class MySqlStorage(SqlStorageTemplate):
 
     def __init__(self, uri):
         self.url = furl(uri)
-        self.db = self._init_connection()
+        self.pool = self._init_pool()
         self._execute_query("CREATE DATABASE IF NOT EXISTS energy_data")
-        self.db = self._init_connection(database=energy_db_name)
+        self.pool = self._init_pool(database=energy_db_name)
         self._execute_query(self.SQL_CREATE_TABLE)
 
-    def _init_connection(self, database=None):
+    def _init_pool(self, database=None):
         user = self.url.username
         password = self.url.password
         host = self.url.host
         port = self.url.port or 3306
+        db_config = {
+            "user": user,
+            "password": password,
+            "host": host,
+            "port": port
+        }
         if database:
-            return mysql.connector.connect(host=host, user=user, password=password, port=port, database=database)
-        else:
-            return mysql.connector.connect(host=host, user=user, password=password, port=port)
+            db_config["database"] = database
+        return MySQLConnectionPool(pool_name="mysql_pool", pool_size=5, **db_config)
 
-    def _get_db_cursor(self):
+    @contextmanager
+    def _managed_cursor(self, commit=False):
+        conn = self.pool.get_connection()
+        cursor = conn.cursor()
         try:
-            return self.db.cursor()
-        except mysql.connector.errors.OperationalError:
-            logging.info("Renew database connection")
-            self.db = self._init_connection(energy_db_name)
-            return self.db.cursor()
+            yield cursor
+            if commit:
+                conn.commit()
+        finally:
+            cursor.close()
+            conn.close()

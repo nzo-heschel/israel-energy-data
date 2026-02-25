@@ -5,6 +5,8 @@ from cryptography.fernet import Fernet
 
 
 def binary_key(plain_text_key):
+    if not plain_text_key:
+        plain_text_key = "default_key"
     padded_key = (plain_text_key + "." * 32)[:32]
     return base64.urlsafe_b64encode(padded_key.encode("utf-8"))
 
