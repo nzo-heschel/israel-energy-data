@@ -5,7 +5,7 @@ from pages import home, bar_chart, heatmap, storage
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ASSETS_PATH = os.path.join(ROOT_DIR, 'assets')
-dash_app = Dash(__name__, assets_folder=ASSETS_PATH)
+dash_app = Dash(__name__, assets_folder=ASSETS_PATH, suppress_callback_exceptions=True)
 LOGO_URL = dash_app.get_asset_url('logo.png')
 
 PATH_BAR_CHART = '/bar-chart'
