@@ -1,4 +1,4 @@
-from dash import dcc, html, Input, Output, callback_context
+from dash import dcc, html, Input, Output, clientside_callback, callback_context
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import logging
@@ -7,6 +7,7 @@ import numpy as np
 from . import heatmap
 
 STORAGE_ID = "storage-graph"
+STORAGE_STORE_ID = "storage-graph-store"
 CUMULATIVE_ID = "cumulative-graph"
 DAILY_ID = "daily-graph"
 DAILY_ENERGY_ID = "daily-energy-graph"
@@ -95,6 +96,7 @@ def storage_layout(nav_links):
 
     return html.Div([
         nav_links,
+        dcc.Store(id=STORAGE_STORE_ID),
         html.Div([
             html.Div([
                 dcc.DatePickerRange(
@@ -134,7 +136,8 @@ def storage_layout(nav_links):
                 dcc.Graph(
                     id=STORAGE_ID, 
                     style={'width': '100%', 'height': '80vh'},
-                    config={'displayModeBar': False, 'scrollZoom': False, 'responsive': True}
+                    config={'displayModeBar': False, 'scrollZoom': False, 'responsive': True},
+                    clear_on_unhover=True
                 )
             ], style={'flex': '6', 'overflow': 'hidden'}),
             
@@ -160,8 +163,66 @@ def storage_layout(nav_links):
     ])
 
 def register_callbacks(app):
+    # Client-side callback for highlighting
+    clientside_callback(
+        """
+        function(hoverData, storedFig) {
+            if (!storedFig) {
+                return window.dash_clientside.no_update;
+            }
+            
+            // If no hover data, return the original figure (reset)
+            if (!hoverData || !hoverData.points || hoverData.points.length === 0) {
+                return storedFig;
+            }
+            
+            const hoveredCurveIndex = hoverData.points[0].curveNumber;
+            
+            // Create a shallow copy of the figure structure
+            // We avoid deep cloning the large data arrays (x, y, r, theta)
+            const newFig = { ...storedFig };
+            
+            newFig.data = storedFig.data.map((trace, i) => {
+                // Shallow copy the trace object
+                const newTrace = { ...trace };
+                
+                // Skip structural traces (like the zero line in polar plot)
+                if (newTrace.hoverinfo === 'skip') {
+                    return newTrace;
+                }
+
+                const isHovered = (i === hoveredCurveIndex);
+                
+                if (isHovered) {
+                    newTrace.opacity = 1.0;
+                    // Highlight with increased size/width, keeping original color
+                    if (newTrace.type === 'scatter' || newTrace.type === 'scattergl') {
+                        newTrace.line = { ...newTrace.line, width: 4 };
+                    } else if (newTrace.type === 'scatterpolargl' || newTrace.type === 'scatterpolar') {
+                        newTrace.marker = { ...newTrace.marker, size: 8 };
+                    }
+                } else {
+                    // Dim others significantly and make them grey
+                    newTrace.opacity = 0.1;
+                    if (newTrace.type === 'scatter' || newTrace.type === 'scattergl') {
+                        newTrace.line = { ...newTrace.line, width: 1, color: '#808080' };
+                    } else if (newTrace.type === 'scatterpolargl' || newTrace.type === 'scatterpolar') {
+                        newTrace.marker = { ...newTrace.marker, size: 3, color: '#808080' };
+                    }
+                }
+                return newTrace;
+            });
+            
+            return newFig;
+        }
+        """,
+        Output(STORAGE_ID, 'figure'),
+        Input(STORAGE_ID, 'hoverData'),
+        Input(STORAGE_STORE_ID, 'data')
+    )
+
     @app.callback(
-        [Output(STORAGE_ID, 'figure'),
+        [Output(STORAGE_STORE_ID, 'data'),
          Output(CUMULATIVE_ID, 'figure'),
          Output(DAILY_ID, 'figure'),
          Output(DAILY_ENERGY_ID, 'figure'),
@@ -290,7 +351,7 @@ def register_callbacks(app):
 
         # Main Graph Traces
         # We still iterate to add traces per day to allow for individual hover info and potential future interactivity
-        for date_col in sorted_cols:
+        for i, date_col in enumerate(sorted_cols):
             series = df_sorted[date_col]
             power_values = series.values
             date_str = date_col.strftime('%d-%m-%Y')
@@ -301,22 +362,25 @@ def register_callbacks(app):
             custom_data_for_hover = list(zip(power_values, times, [date_str]*len(times)))
             
             if is_xy:
-                fig_main.add_trace(go.Scatter(
+                fig_main.add_trace(go.Scattergl(
                     x=dt_times,
                     y=power_values,
                     customdata=custom_data_for_hover,
                     mode='lines',
                     name=date_str,
                     hovertemplate='Date: %{customdata[2]}<br>Time: %{customdata[1]}<br>Power: %{y:.2f} MW<extra></extra>',
-                    showlegend=False
+                    showlegend=False,
+                    line=dict(width=1.5)
                 ))
             else:
-                fig_main.add_trace(go.Scatterpolar(
+                fig_main.add_trace(go.Scatterpolargl(
                     r=power_values,
                     theta=theta,
                     customdata=custom_data_for_hover,
                     mode='markers',
-                    marker=dict(size=6),
+                    marker=dict(
+                        size=6
+                    ),
                     name=date_str,
                     hovertemplate='Date: %{customdata[2]}<br>Time: %{customdata[1]}<br>Power: %{customdata[0]:.2f} MW<extra></extra>',
                     showlegend=False
