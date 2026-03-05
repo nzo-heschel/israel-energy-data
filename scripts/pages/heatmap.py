@@ -1,4 +1,4 @@
-from dash import dcc, html, Input, Output, callback_context
+from dash import dcc, html, Input, Output, State, callback_context
 from dash.exceptions import PreventUpdate
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -12,6 +12,8 @@ HEATMAP_ID = "heatmap-graph"
 SOURCES_ID = "sources-radioitems"
 FREEZE_SCALE_ID = "freeze-scale"
 FREEZE_SCALE_VALUE = "Freeze Scale"
+VIEW_MODE_ID = "view-mode"
+VIEW_STATE_STORE_ID = "view-state-store"
 
 select_source = "Pv"
 start_date = "01-01-2024"
@@ -82,11 +84,19 @@ def retrieve_data():
 def heatmap_layout(nav_links):
     return html.Div([
         nav_links,
+        dcc.Store(id=VIEW_STATE_STORE_ID, data={}),
         dcc.Graph(
             id=HEATMAP_ID,
             style={'marginBottom': '0px'}
         ),
         html.Div([
+            dcc.RadioItems(
+                id=VIEW_MODE_ID,
+                options=['Absolute', 'Percent'],
+                value='Absolute',
+                inline=False,
+                style={'marginRight': '20px'}
+            ),
             dcc.Checklist(id=FREEZE_SCALE_ID, options=[FREEZE_SCALE_VALUE], value=[])
         ],
             style={
@@ -110,11 +120,69 @@ def heatmap_layout(nav_links):
 
 def register_callbacks(app):
     @app.callback(
+        Output(VIEW_STATE_STORE_ID, 'data'),
+        [Input(HEATMAP_ID, 'relayoutData')],
+        [State(VIEW_STATE_STORE_ID, 'data')]
+    )
+    def update_view_state(relayout_data, current_data):
+        if not relayout_data:
+            return current_data or {}
+        
+        if current_data is None:
+            current_data = {}
+            
+        # Helper to extract range
+        def get_range(axis_prefix):
+            if f'{axis_prefix}.range[0]' in relayout_data and f'{axis_prefix}.range[1]' in relayout_data:
+                return [relayout_data[f'{axis_prefix}.range[0]'], relayout_data[f'{axis_prefix}.range[1]']]
+            elif f'{axis_prefix}.range' in relayout_data:
+                return relayout_data[f'{axis_prefix}.range']
+            return None
+
+        # Helper to check autorange
+        def is_autorange(axis_prefix):
+            return relayout_data.get(f'{axis_prefix}.autorange', False)
+
+        # Update X range
+        if is_autorange('xaxis'):
+            current_data.pop('xaxis', None)
+        else:
+            x_range = get_range('xaxis')
+            if x_range:
+                current_data['xaxis'] = x_range
+            # Fallback for other axes if user zoomed on subplot
+            elif 'xaxis' not in current_data: # Only look for fallback if we don't have a range yet? No, look if relayout has it
+                 for key in relayout_data:
+                    if 'xaxis' in key and 'range' in key and isinstance(relayout_data[key], list):
+                        current_data['xaxis'] = relayout_data[key]
+                        break
+
+        # Update Y Top range
+        if is_autorange('yaxis'):
+            current_data.pop('yaxis', None)
+        else:
+            y_top_range = get_range('yaxis')
+            if y_top_range:
+                current_data['yaxis'] = y_top_range
+
+        # Update Y Bottom range
+        if is_autorange('yaxis2'):
+            current_data.pop('yaxis2', None)
+        else:
+            y_bottom_range = get_range('yaxis2')
+            if y_bottom_range:
+                current_data['yaxis2'] = y_bottom_range
+                
+        return current_data
+
+    @app.callback(
         Output(HEATMAP_ID, 'figure'),
         [Input(SOURCES_ID, 'value'),
-         Input(FREEZE_SCALE_ID, 'value')]
+         Input(FREEZE_SCALE_ID, 'value'),
+         Input(VIEW_MODE_ID, 'value')],
+        [State(VIEW_STATE_STORE_ID, 'data')]
     )
-    def update_heatmap_output(source, freeze_scale_value):
+    def update_heatmap_output(source, freeze_scale_value, view_mode, view_state):
         global dfs, global_zmin, global_zmax, global_freeze_source
         freeze_checked = FREEZE_SCALE_VALUE in freeze_scale_value
         triggered_id = callback_context.triggered[0]['prop_id'].split('.')[0]
@@ -128,18 +196,31 @@ def register_callbacks(app):
         retrieve_data()
         logging.info(f"Update heatmap: {source}"
                      f"{(' (' + FREEZE_SCALE_VALUE + ')') if freeze_checked else ''}")
-        dfs_heatmap = dfs[source]
+        
+        if view_mode == 'Percent':
+            dfs_heatmap = (dfs[source] / dfs['ActualDemand']) * 100
+            top_y = (dfs[source].sum() / dfs['ActualDemand'].sum()) * 100
+            y_axis_title = "%"
+            hover_template_top = '<i>%{x} : %{y:.2f} %</i><extra></extra>'
+            hover_template_heatmap = '<i>%{x} %{y}</i><br>%{z:.2f} %<extra></extra>'
+        else:
+            dfs_heatmap = dfs[source]
+            top_y = dfs_heatmap.sum() / 12
+            y_axis_title = "MWh"
+            hover_template_top = '<i>%{x} : %{y:,.2f} MWh</i><extra></extra>'
+            hover_template_heatmap = '<i>%{x} %{y}</i><br>%{z:,.2f} MW<extra></extra>'
+
         n_y = len(dfs_heatmap.index) / 4
         fig = make_subplots(rows=2, cols=1, row_heights=[100, 600],vertical_spacing=0.05, shared_xaxes=True)
         fig.add_trace(
             go.Scatter(
                 x=dfs_heatmap.columns.values,
-                y=dfs_heatmap.sum() / 12,
-                hovertemplate='<i>%{x} : %{y:,.2f} MWh</i><extra></extra>'
+                y=top_y,
+                hovertemplate=hover_template_top
             ),
             row=1, col=1)
 
-        if not freeze_checked:
+        if not freeze_checked or triggered_id == VIEW_MODE_ID:
             global_zmin = dfs_heatmap.min().min()
             global_zmax = dfs_heatmap.max().max()
 
@@ -152,18 +233,39 @@ def register_callbacks(app):
                 zmin=global_zmin,
                 zmax=global_zmax,
                 colorbar={'len': 0.8, 'y': 0.4},
-                hovertemplate='<i>%{x} %{y}</i><br>%{z:,.2f} MW<extra></extra>'
+                hovertemplate=hover_template_heatmap
             ),
             row=2, col=1)
         fig.update_xaxes(showticklabels=False, row=1, col=1)
-        fig.update_yaxes(title_text="MWh", col=1, row=1)
+        fig.update_yaxes(title_text=y_axis_title, col=1, row=1)
+        
+        # Apply stored view state
+        if view_state:
+            logging.info(f"View state: {view_state}")
+            
+            # Apply X range
+            if 'xaxis' in view_state:
+                fig.update_xaxes(range=view_state['xaxis'])
+            
+            # Apply Y Bottom range
+            if 'yaxis2' in view_state:
+                fig.update_yaxes(range=view_state['yaxis2'], row=2, col=1)
+                
+            if triggered_id == VIEW_MODE_ID:
+                # Force reset Top Y when switching view mode
+                fig.update_yaxes(autorange=True, row=1, col=1)
+            else:
+                # Preserve Top Y otherwise
+                if 'yaxis' in view_state:
+                    fig.update_yaxes(range=view_state['yaxis'], row=1, col=1)
+
         fig.update_yaxes(
             tickvals=[0, n_y - 1, n_y * 2 - 1, n_y * 3 - 1, n_y * 4 - 1],
             ticktext=['00:00', '06:00', '12:00', '18:00', '24:00'],
             row=2, col=1)
         fig.update_layout(
             height=800,
-            uirevision=True,
+            uirevision=view_mode,
             title=go.layout.Title(
                 x=0.5,
                 xanchor='center',
