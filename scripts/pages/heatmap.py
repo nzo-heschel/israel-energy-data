@@ -11,7 +11,10 @@ from scripts import utils
 HEATMAP_ID = "heatmap-graph"
 SOURCES_ID = "sources-radioitems"
 FREEZE_SCALE_ID = "freeze-scale"
+DISPLAY_MODE_ID = "display-mode-radioitems"
 FREEZE_SCALE_VALUE = "Freeze Scale"
+MODE_ABSOLUTE = "Absolute"
+MODE_PERCENT = "Percent"
 
 select_source = "Pv"
 start_date = "01-01-2024"
@@ -79,6 +82,17 @@ def retrieve_data():
     sources = [s for s in list(d2.keys()) if s not in ["Actualdemand", "DemandManagement", "Renewables"]]
     last_call = datetime.now()
 
+
+def compute_percent_df(source_df, demand_df):
+    """Return source as a percentage of ActualDemand, aligned on shared columns/index."""
+    aligned_source, aligned_demand = source_df.align(demand_df, join='inner')
+    # Avoid division by zero — cells where demand is 0 become NaN
+    percent_df = aligned_source.div(aligned_demand.replace(0, float('nan'))) * 100
+    percent_df.index.name = source_df.index.name
+    percent_df.columns.name = source_df.columns.name
+    return percent_df
+
+
 def heatmap_layout(nav_links):
     return html.Div([
         nav_links,
@@ -101,6 +115,13 @@ def heatmap_layout(nav_links):
             }
         ),
         dcc.RadioItems(
+            id=DISPLAY_MODE_ID,
+            options=[MODE_ABSOLUTE, MODE_PERCENT],
+            value=MODE_ABSOLUTE,
+            inline=True,
+            style={'textAlign': 'center', 'fontSize': 18, 'marginBottom': '6px'}
+        ),
+        dcc.RadioItems(
             id=SOURCES_ID,
             options=sources,
             value=select_source,
@@ -112,11 +133,13 @@ def register_callbacks(app):
     @app.callback(
         Output(HEATMAP_ID, 'figure'),
         [Input(SOURCES_ID, 'value'),
-         Input(FREEZE_SCALE_ID, 'value')]
+         Input(FREEZE_SCALE_ID, 'value'),
+         Input(DISPLAY_MODE_ID, 'value')]
     )
-    def update_heatmap_output(source, freeze_scale_value):
+    def update_heatmap_output(source, freeze_scale_value, display_mode):
         global dfs, global_zmin, global_zmax, global_freeze_source
         freeze_checked = FREEZE_SCALE_VALUE in freeze_scale_value
+        is_percent = display_mode == MODE_PERCENT
         triggered_id = callback_context.triggered[0]['prop_id'].split('.')[0]
         if triggered_id == FREEZE_SCALE_ID:
             if freeze_checked: # When freezing the scale, no need to update the figure
@@ -126,16 +149,40 @@ def register_callbacks(app):
                 if source == global_freeze_source: # If source is the same as the one when scale was frozen then no update
                     raise PreventUpdate
         retrieve_data()
-        logging.info(f"Update heatmap: {source}"
+        logging.info(f"Update heatmap: {source} [{display_mode}]"
                      f"{(' (' + FREEZE_SCALE_VALUE + ')') if freeze_checked else ''}")
-        dfs_heatmap = dfs[source]
+
+        source_df = dfs[source]
+
+        if is_percent:
+            if "ActualDemand" not in dfs:
+                logging.warning("ActualDemand source not available for percent mode.")
+                dfs_heatmap = source_df
+            else:
+                dfs_heatmap = compute_percent_df(source_df, dfs["ActualDemand"])
+        else:
+            dfs_heatmap = source_df
+
         n_y = len(dfs_heatmap.index) / 4
-        fig = make_subplots(rows=2, cols=1, row_heights=[100, 600],vertical_spacing=0.05, shared_xaxes=True)
+        fig = make_subplots(rows=2, cols=1, row_heights=[100, 600], vertical_spacing=0.05, shared_xaxes=True)
+
+        if is_percent:
+            # Top chart: mean daily percentage
+            scatter_y = dfs_heatmap.mean()
+            scatter_hover = '<i>%{x} : %{y:,.1f}%</i><extra></extra>'
+            scatter_yaxis_label = "%"
+            heatmap_hover = '<i>%{x} %{y}</i><br>%{z:,.1f}%<extra></extra>'
+        else:
+            scatter_y = dfs_heatmap.sum() / 12
+            scatter_hover = '<i>%{x} : %{y:,.2f} MWh</i><extra></extra>'
+            scatter_yaxis_label = "MWh"
+            heatmap_hover = '<i>%{x} %{y}</i><br>%{z:,.2f} MW<extra></extra>'
+
         fig.add_trace(
             go.Scatter(
                 x=dfs_heatmap.columns.values,
-                y=dfs_heatmap.sum() / 12,
-                hovertemplate='<i>%{x} : %{y:,.2f} MWh</i><extra></extra>'
+                y=scatter_y,
+                hovertemplate=scatter_hover
             ),
             row=1, col=1)
 
@@ -151,12 +198,16 @@ def register_callbacks(app):
                 colorscale=BLUE_RED_COLORSCALE,
                 zmin=global_zmin,
                 zmax=global_zmax,
-                colorbar={'len': 0.8, 'y': 0.4},
-                hovertemplate='<i>%{x} %{y}</i><br>%{z:,.2f} MW<extra></extra>'
+                colorbar={
+                    'len': 0.8,
+                    'y': 0.4,
+                    'ticksuffix': '%' if is_percent else ''
+                },
+                hovertemplate=heatmap_hover
             ),
             row=2, col=1)
         fig.update_xaxes(showticklabels=False, row=1, col=1)
-        fig.update_yaxes(title_text="MWh", col=1, row=1)
+        fig.update_yaxes(title_text=scatter_yaxis_label, col=1, row=1)
         fig.update_yaxes(
             tickvals=[0, n_y - 1, n_y * 2 - 1, n_y * 3 - 1, n_y * 4 - 1],
             ticktext=['00:00', '06:00', '12:00', '18:00', '24:00'],
