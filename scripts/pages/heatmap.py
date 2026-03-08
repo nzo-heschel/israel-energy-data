@@ -41,13 +41,12 @@ dfs_heatmap = None
 dfs_zero = None
 sources = []
 
-global_zmin = 0
-global_zmax = 1
-global_freeze_source = None  # The source for which the (heatmap) scale is frozen
+global_freeze_source = None  # The source for which the scale is frozen
 
-# Last-seen scatter Y range per display mode, updated every time we draw unfrozen.
-# When freeze is checked these values are held and re-applied explicitly on every redraw,
-# which is the only reliable way to keep Plotly from rescaling when new trace data arrives.
+# Last-seen heatmap Z range and scatter Y range, keyed by display mode.
+# Updated on every unfrozen draw; held and re-applied explicitly when frozen.
+# None means 'not yet drawn in this mode' — first draw seeds the value even if frozen.
+last_zrange = {MODE_ABSOLUTE: None, MODE_PERCENT: None}
 last_scatter_yrange = {MODE_ABSOLUTE: None, MODE_PERCENT: None}
 
 
@@ -167,7 +166,7 @@ def register_callbacks(app):
          Input(DISPLAY_MODE_ID, 'value')]
     )
     def update_heatmap_output(source, freeze_scale_value, display_mode):
-        global dfs, global_zmin, global_zmax, global_freeze_source, last_scatter_yrange
+        global dfs, global_freeze_source, last_zrange, last_scatter_yrange
         freeze_checked = FREEZE_SCALE_VALUE in freeze_scale_value
         is_percent = display_mode == MODE_PERCENT
         triggered_id = callback_context.triggered[0]['prop_id'].split('.')[0]
@@ -228,9 +227,16 @@ def register_callbacks(app):
             last_scatter_yrange[display_mode] = current_data_yrange
             scatter_yrange = current_data_yrange
 
-        if not freeze_checked:
-            global_zmin = dfs_heatmap.min().min()
-            global_zmax = dfs_heatmap.max().max()
+        # Heatmap Z range — same pattern as scatter Y range.
+        current_zmin = dfs_heatmap.min().min()
+        current_zmax = dfs_heatmap.max().max()
+        if freeze_checked:
+            if last_zrange[display_mode] is None:
+                last_zrange[display_mode] = [current_zmin, current_zmax]
+            zmin, zmax = last_zrange[display_mode]
+        else:
+            last_zrange[display_mode] = [current_zmin, current_zmax]
+            zmin, zmax = current_zmin, current_zmax
 
         fig = make_subplots(rows=2, cols=1, row_heights=[100, 600], vertical_spacing=0.05, shared_xaxes=True)
 
@@ -248,8 +254,8 @@ def register_callbacks(app):
                 y=dfs_heatmap.index,
                 z=dfs_heatmap,
                 colorscale=BLUE_RED_COLORSCALE,
-                zmin=global_zmin,
-                zmax=global_zmax,
+                zmin=zmin,
+                zmax=zmax,
                 colorbar={
                     'len': 0.8,
                     'y': 0.4,
