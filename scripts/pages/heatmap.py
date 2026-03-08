@@ -1,4 +1,4 @@
-from dash import dcc, html, Input, Output, callback_context
+from dash import dcc, html, Input, Output, State, callback_context
 from dash.exceptions import PreventUpdate
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -85,7 +85,7 @@ def retrieve_data():
         else:
             dfs[source] = df
     dfs_zero = pd.DataFrame(0, index=dfs[select_source].index, columns=dfs[select_source].columns)
-    sources = [s for s in list(d2.keys()) if s not in ["ActualDemand", "DemandManagement", "Renewables"]]
+    sources = [s for s in list(d2.keys()) if s not in ["DemandManagement", "Renewables"]]
     last_call = datetime.now()
 
 
@@ -145,6 +145,21 @@ def heatmap_layout(nav_links):
 
 
 def register_callbacks(app):
+    @app.callback(
+        Output(SOURCES_ID, 'options'),
+        Output(SOURCES_ID, 'value'),
+        Input(DISPLAY_MODE_ID, 'value'),
+        State(SOURCES_ID, 'value')
+    )
+    def update_source_options(display_mode, current_source):
+        if display_mode == MODE_PERCENT:
+            options = [s for s in sources if s != "ActualDemand"]
+            value = select_source if current_source == "ActualDemand" else current_source
+        else:
+            options = sources
+            value = current_source
+        return options, value
+
     @app.callback(
         Output(HEATMAP_ID, 'figure'),
         [Input(SOURCES_ID, 'value'),
