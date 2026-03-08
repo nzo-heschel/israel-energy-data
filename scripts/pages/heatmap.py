@@ -190,7 +190,7 @@ def register_callbacks(app):
             top_y = dfs_heatmap.sum() / 12
             y_axis_title = "MWh"
             hover_template_top = '<i>%{x} : %{y:,.2f} MWh</i><extra></extra>'
-            hover_template_heatmap = '<i>%{x} %{y}</i><br>%{z:,.2f} MW<extra></extra>'
+            hover_template_heatmap = '<i>%{x} %{y}</i><br>%{z:.2f} MW<extra></extra>'
 
         n_y = len(dfs_heatmap.index) / 4
         fig = make_subplots(rows=2, cols=1, row_heights=[100, 600], vertical_spacing=0.05, shared_xaxes=True)
@@ -207,29 +207,30 @@ def register_callbacks(app):
         view_state = view_state or {}
         view_mode_key = view_mode.lower()
         
-        # Determine uirevision and Y-axis behavior
-        revision_key = ""
-        if not freeze_checked:
-            # Rule 1 & 4: Not frozen, so always autoscale Y. Use a unique revision to force a reset.
-            fig.update_yaxes(autorange=True, row=1, col=1)
-            revision_key = f"reset-{datetime.now().timestamp()}"
-        else:
-            # Rule 2, 3, 5: Frozen. Use a stable key for preservation.
-            revision_key = f"frozen-{view_mode}"
-            # Rule 5b: Try to apply a stored manual range for the current view mode.
-            stored_y_range = view_state.get(view_mode_key, {}).get('yaxis')
-            if stored_y_range:
-                fig.update_yaxes(range=stored_y_range, row=1, col=1)
-            elif triggered_id == VIEW_MODE_ID:
-                # Rule 5b (first time): No stored range for this mode, so autoscale it once.
-                fig.update_yaxes(autorange=True, row=1, col=1)
-            # Rule 2 & 3: If no stored range and not switching modes, do nothing.
-            # The stable `revision_key` will preserve the last view.
-
-        # Always preserve shared axes if they are in the state, to counteract the reset key
+        # Always preserve shared axes if they are in the state
         if 'xaxis' in view_state: fig.update_xaxes(range=view_state['xaxis'])
         if 'yaxis2' in view_state: fig.update_yaxes(range=view_state['yaxis2'], row=2, col=1)
 
+        # Apply top Y-axis logic based on rules
+        if not freeze_checked:
+            # Rules 1, 4, 5a: Not frozen, so explicitly reset the axis to override uirevision's preservation.
+            fig.update_yaxes(autorange=True, range=None, row=1, col=1)
+        else:
+            # Rules 2, 3, 5b: Frozen.
+            if triggered_id == VIEW_MODE_ID:
+                # Rule 5b: Switching view modes while frozen.
+                stored_y_range = view_state.get(view_mode_key, {}).get('yaxis')
+                if stored_y_range:
+                    # Use last known scale for this mode.
+                    fig.update_yaxes(autorange=False, range=stored_y_range, row=1, col=1)
+                else:
+                    # First time in this mode while frozen, so autoscale.
+                    fig.update_yaxes(autorange=True, range=None, row=1, col=1)
+            else:
+                # Rules 2, 3: Changing source or other interactions while frozen.
+                # Do nothing to the top Y-axis. Let uirevision=True preserve the last view.
+                pass
+
         fig.update_yaxes(tickvals=[0, n_y - 1, n_y * 2 - 1, n_y * 3 - 1, n_y * 4 - 1], ticktext=['00:00', '06:00', '12:00', '18:00', '24:00'], row=2, col=1)
-        fig.update_layout(height=800, uirevision=revision_key, title=go.layout.Title(x=0.5, xanchor='center', font={"family": "Hebrew", "size": 36}, text='תמהיל הייצור'))
+        fig.update_layout(height=800, uirevision=True, title=go.layout.Title(x=0.5, xanchor='center', font={"family": "Hebrew", "size": 36}, text='תמהיל הייצור'))
         return fig
