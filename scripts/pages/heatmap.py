@@ -43,7 +43,13 @@ sources = []
 
 global_zmin = 0
 global_zmax = 1
-global_freeze_source = None # The source for which the scale is frozen
+global_freeze_source = None  # The source for which the (heatmap) scale is frozen
+
+# Last-seen scatter Y range per display mode, updated every time we draw unfrozen.
+# When freeze is checked these values are held and re-applied explicitly on every redraw,
+# which is the only reliable way to keep Plotly from rescaling when new trace data arrives.
+last_scatter_yrange = {MODE_ABSOLUTE: None, MODE_PERCENT: None}
+
 
 def retrieve_data():
     global last_call, dfs_zero, sources, dfs, start_date
@@ -79,7 +85,7 @@ def retrieve_data():
         else:
             dfs[source] = df
     dfs_zero = pd.DataFrame(0, index=dfs[select_source].index, columns=dfs[select_source].columns)
-    sources = [s for s in list(d2.keys()) if s not in ["Actualdemand", "DemandManagement", "Renewables"]]
+    sources = [s for s in list(d2.keys()) if s not in ["ActualDemand", "DemandManagement", "Renewables"]]
     last_call = datetime.now()
 
 
@@ -91,6 +97,14 @@ def compute_percent_df(source_df, demand_df):
     percent_df.index.name = source_df.index.name
     percent_df.columns.name = source_df.columns.name
     return percent_df
+
+
+def _data_yrange(scatter_series):
+    """Compute a tight [ymin, ymax] from the scatter data, with a small 5% padding."""
+    ymin = scatter_series.min()
+    ymax = scatter_series.max()
+    pad = (ymax - ymin) * 0.05 if ymax != ymin else abs(ymax) * 0.05 or 1
+    return [ymin - pad, ymax + pad]
 
 
 def heatmap_layout(nav_links):
@@ -129,6 +143,7 @@ def heatmap_layout(nav_links):
             style={'textAlign': 'center', 'fontSize': 20, 'marginTop': '0px'}),
     ])
 
+
 def register_callbacks(app):
     @app.callback(
         Output(HEATMAP_ID, 'figure'),
@@ -137,17 +152,18 @@ def register_callbacks(app):
          Input(DISPLAY_MODE_ID, 'value')]
     )
     def update_heatmap_output(source, freeze_scale_value, display_mode):
-        global dfs, global_zmin, global_zmax, global_freeze_source
+        global dfs, global_zmin, global_zmax, global_freeze_source, last_scatter_yrange
         freeze_checked = FREEZE_SCALE_VALUE in freeze_scale_value
         is_percent = display_mode == MODE_PERCENT
         triggered_id = callback_context.triggered[0]['prop_id'].split('.')[0]
-        if triggered_id == FREEZE_SCALE_ID:
-            if freeze_checked: # When freezing the scale, no need to update the figure
-                global_freeze_source = source # Keep track for which source the scale was frozen
-                raise PreventUpdate
-            else: # Freeze scale is unchecked
-                if source == global_freeze_source: # If source is the same as the one when scale was frozen then no update
-                    raise PreventUpdate
+
+        # Checking freeze: nothing to redraw, just record which source was active.
+        # The Y range to freeze is whatever was last drawn for this mode, already stored
+        # in last_scatter_yrange[display_mode].
+        if triggered_id == FREEZE_SCALE_ID and freeze_checked:
+            global_freeze_source = source
+            raise PreventUpdate
+
         retrieve_data()
         logging.info(f"Update heatmap: {source} [{display_mode}]"
                      f"{(' (' + FREEZE_SCALE_VALUE + ')') if freeze_checked else ''}")
@@ -164,10 +180,8 @@ def register_callbacks(app):
             dfs_heatmap = source_df
 
         n_y = len(dfs_heatmap.index) / 4
-        fig = make_subplots(rows=2, cols=1, row_heights=[100, 600], vertical_spacing=0.05, shared_xaxes=True)
 
         if is_percent:
-            # Top chart: mean daily percentage
             scatter_y = dfs_heatmap.mean()
             scatter_hover = '<i>%{x} : %{y:,.1f}%</i><extra></extra>'
             scatter_yaxis_label = "%"
@@ -178,6 +192,33 @@ def register_callbacks(app):
             scatter_yaxis_label = "MWh"
             heatmap_hover = '<i>%{x} %{y}</i><br>%{z:,.2f} MW<extra></extra>'
 
+        # Decide the scatter Y range to apply.
+        #
+        # freeze_checked=True:
+        #   Use last_scatter_yrange[mode]. If it is None (e.g. page was just loaded and
+        #   freeze was checked before any source switch), compute it from the current data
+        #   and store it so subsequent source switches keep the same range.
+        #
+        # freeze_checked=False:
+        #   Always compute from current data and update last_scatter_yrange[mode]
+        #   so that if the user later checks freeze, we have the latest range ready.
+        current_data_yrange = _data_yrange(scatter_y)
+
+        if freeze_checked:
+            if last_scatter_yrange[display_mode] is None:
+                # First draw in this mode while frozen — seed the stored range
+                last_scatter_yrange[display_mode] = current_data_yrange
+            scatter_yrange = last_scatter_yrange[display_mode]
+        else:
+            last_scatter_yrange[display_mode] = current_data_yrange
+            scatter_yrange = current_data_yrange
+
+        if not freeze_checked:
+            global_zmin = dfs_heatmap.min().min()
+            global_zmax = dfs_heatmap.max().max()
+
+        fig = make_subplots(rows=2, cols=1, row_heights=[100, 600], vertical_spacing=0.05, shared_xaxes=True)
+
         fig.add_trace(
             go.Scatter(
                 x=dfs_heatmap.columns.values,
@@ -185,10 +226,6 @@ def register_callbacks(app):
                 hovertemplate=scatter_hover
             ),
             row=1, col=1)
-
-        if not freeze_checked:
-            global_zmin = dfs_heatmap.min().min()
-            global_zmax = dfs_heatmap.max().max()
 
         fig.add_trace(
             go.Heatmap(
@@ -206,8 +243,12 @@ def register_callbacks(app):
                 hovertemplate=heatmap_hover
             ),
             row=2, col=1)
+
         fig.update_xaxes(showticklabels=False, row=1, col=1)
-        fig.update_yaxes(title_text=scatter_yaxis_label, col=1, row=1)
+        # Always set an explicit range on the scatter Y axis — this is the only reliable
+        # way to control it. Plotly ignores uirevision for axis range when new trace data
+        # is provided, so we must own the range completely rather than delegating to Plotly.
+        fig.update_yaxes(title_text=scatter_yaxis_label, range=scatter_yrange, col=1, row=1)
         fig.update_yaxes(
             tickvals=[0, n_y - 1, n_y * 2 - 1, n_y * 3 - 1, n_y * 4 - 1],
             ticktext=['00:00', '06:00', '12:00', '18:00', '24:00'],
