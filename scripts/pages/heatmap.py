@@ -16,6 +16,10 @@ FREEZE_SCALE_VALUE = "Freeze Scale"
 MODE_ABSOLUTE = "Absolute"
 MODE_PERCENT = "Percent"
 
+STORAGE_NET_SOURCES = {"PspNet", "BatteriesNet"}
+COLOR_DISCHARGE = "green"
+COLOR_CHARGE = "red"
+
 select_source = "Pv"
 start_date = "01-01-2024"
 
@@ -98,10 +102,10 @@ def compute_percent_df(source_df, demand_df):
     return percent_df
 
 
-def _data_yrange(scatter_series):
-    """Compute a tight [ymin, ymax] from the scatter data, with a small 5% padding."""
-    ymin = scatter_series.min()
-    ymax = scatter_series.max()
+def _data_yrange(*scatter_series_list):
+    """Compute a tight [ymin, ymax] from one or more scatter series, with a small 5% padding."""
+    ymin = min(s.min() for s in scatter_series_list)
+    ymax = max(s.max() for s in scatter_series_list)
     pad = (ymax - ymin) * 0.05 if ymax != ymin else abs(ymax) * 0.05 or 1
     return [ymin - pad, ymax + pad]
 
@@ -196,15 +200,22 @@ def register_callbacks(app):
         n_y = len(dfs_heatmap.index) / 4
 
         if is_percent:
+            valid_counts = dfs_heatmap.count().replace(0, float('nan'))
             scatter_y = dfs_heatmap.mean()
+            scatter_pos_y = dfs_heatmap[dfs_heatmap > 0].sum() / valid_counts
+            scatter_neg_y = -dfs_heatmap[dfs_heatmap < 0].sum() / valid_counts
             scatter_hover = '<i>%{x} : %{y:,.1f}%</i><extra></extra>'
             scatter_yaxis_label = "%"
             heatmap_hover = '<i>%{x} %{y}</i><br>%{z:,.1f}%<extra></extra>'
         else:
             scatter_y = dfs_heatmap.sum() / 12
+            scatter_pos_y = dfs_heatmap[dfs_heatmap > 0].sum() / 12
+            scatter_neg_y = -dfs_heatmap[dfs_heatmap < 0].sum() / 12
             scatter_hover = '<i>%{x} : %{y:,.2f} MWh</i><extra></extra>'
             scatter_yaxis_label = "MWh"
             heatmap_hover = '<i>%{x} %{y}</i><br>%{z:,.2f} MW<extra></extra>'
+
+        show_pos_neg = source in STORAGE_NET_SOURCES
 
         # Decide the scatter Y range to apply.
         #
@@ -216,7 +227,10 @@ def register_callbacks(app):
         # freeze_checked=False:
         #   Always compute from current data and update last_scatter_yrange[mode]
         #   so that if the user later checks freeze, we have the latest range ready.
-        current_data_yrange = _data_yrange(scatter_y)
+        if show_pos_neg:
+            current_data_yrange = _data_yrange(scatter_pos_y, scatter_neg_y)
+        else:
+            current_data_yrange = _data_yrange(scatter_y)
 
         if freeze_checked:
             if last_scatter_yrange[display_mode] is None:
@@ -240,13 +254,33 @@ def register_callbacks(app):
 
         fig = make_subplots(rows=2, cols=1, row_heights=[100, 600], vertical_spacing=0.05, shared_xaxes=True)
 
-        fig.add_trace(
-            go.Scatter(
-                x=dfs_heatmap.columns.values,
-                y=scatter_y,
-                hovertemplate=scatter_hover
-            ),
-            row=1, col=1)
+        if show_pos_neg:
+            fig.add_trace(
+                go.Scatter(
+                    x=dfs_heatmap.columns.values,
+                    y=scatter_pos_y,
+                    name='Discharge',
+                    line=dict(color=COLOR_DISCHARGE),
+                    hovertemplate=scatter_hover
+                ),
+                row=1, col=1)
+            fig.add_trace(
+                go.Scatter(
+                    x=dfs_heatmap.columns.values,
+                    y=scatter_neg_y,
+                    name='Charge',
+                    line=dict(color=COLOR_CHARGE),
+                    hovertemplate=scatter_hover
+                ),
+                row=1, col=1)
+        else:
+            fig.add_trace(
+                go.Scatter(
+                    x=dfs_heatmap.columns.values,
+                    y=scatter_y,
+                    hovertemplate=scatter_hover
+                ),
+                row=1, col=1)
 
         fig.add_trace(
             go.Heatmap(
@@ -276,6 +310,7 @@ def register_callbacks(app):
             row=2, col=1)
         fig.update_layout(
             height=800,
+            showlegend=show_pos_neg,
             uirevision=True,
             title=go.layout.Title(
                 x=0.5,

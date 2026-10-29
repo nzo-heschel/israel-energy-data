@@ -45,7 +45,7 @@ NS_LABEL_MAP_HEB2ENG = {
         "מתנול": "Methanol",
         "חסכון בפליטות על ידי ייצור באנרגיות מתחדשות": "Renewables",
         'סה"כ פליטות לא כולל מתחדשות': "Co2 From All Sites Without Renewables",
-        'יחס פליטות (mTCO2\MWh) CO2': "Co2 Ratio"
+        'יחס פליטות (mTCO2\\MWh) CO2': "Co2 Ratio"
     },
     NS_FORECAST2: {
         "(MW) מתחדשות": "Renewable"

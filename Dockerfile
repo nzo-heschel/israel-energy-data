@@ -1,4 +1,4 @@
-FROM python:3.13-slim
+FROM python:3.15-slim
 
 # Install dependencies and clean up apt cache
 RUN apt-get update && \
