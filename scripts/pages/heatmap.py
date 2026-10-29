@@ -61,23 +61,45 @@ def retrieve_data():
         logging.info("Time since last call: {} seconds. No URL call.".format(int(time_since_last_call.total_seconds())))
         return
 
-    heatmap_url = f'http://0.0.0.0:9999/get?source=noga2&type=energy&start_date={start_date}&time=all&format=bin'
-    json_list = utils.retrieve_url(heatmap_url)
-    e = dict(sorted(json_list["noga2.energy"].items(), key=lambda d: datetime.strptime(d[0], "%d-%m-%Y")))
+    today = datetime.now()
+    start_year = datetime.strptime(start_date, "%d-%m-%Y").year
+    end_year = today.year
+
     d2 = {}
-    date = None
-    for _date, time_dict in e.items():
-        date = datetime.strptime(_date, "%d-%m-%Y")
-        for time, sources_dict in time_dict.items():
-            # Noga has spurious data on 03-07-2025,14:36 and 28-05-2024,12:18
-            if time == '12:18':
-                time = '12:15'  # No data for 12:15 so use 12:18 instead.
-            if time == '14:36':
-                continue  # There are points for 14:35 and 14:40, so just skip it.
-            for source, value in sources_dict.items():
-                s = "Diesel" if source == "Solar" else source
-                d2.setdefault(s, {}).setdefault(date, {})[time] = value
-    start_date = date.strftime("%d-%m-%Y")
+    latest_date = None
+    for yr in range(start_year, end_year + 1):
+        chunk_start = start_date if yr == start_year else f"01-01-{yr}"
+        chunk_end = today.strftime("%d-%m-%Y") if yr == end_year else f"31-12-{yr}"
+        heatmap_url = (
+            f'http://0.0.0.0:9999/get?source=noga2&type=energy'
+            f'&start_date={chunk_start}&end_date={chunk_end}&time=all&format=bin'
+        )
+        json_list = utils.retrieve_url(heatmap_url)
+        if not json_list or "noga2.energy" not in json_list:
+            continue
+        sorted_items = sorted(
+            ((datetime.strptime(d_str, "%d-%m-%Y"), time_dict)
+             for d_str, time_dict in json_list["noga2.energy"].items()),
+            key=lambda x: x[0]
+        )
+        del json_list
+        for date, time_dict in sorted_items:
+            latest_date = date
+            for time, sources_dict in time_dict.items():
+                # Noga has spurious data on 03-07-2025,14:36 and 28-05-2024,12:18
+                if time == '12:18':
+                    time = '12:15'  # No data for 12:15 so use 12:18 instead.
+                if time == '14:36':
+                    continue  # There are points for 14:35 and 14:40, so just skip it.
+                for source, value in sources_dict.items():
+                    s = "Diesel" if source == "Solar" else source
+                    d2.setdefault(s, {}).setdefault(date, {})[time] = value
+        del sorted_items
+
+    if latest_date is None:
+        return
+
+    start_date = latest_date.strftime("%d-%m-%Y")
     for source, date_dict in d2.items():
         df = pd.DataFrame(date_dict).fillna(0)
         df.index.name = "Time"
