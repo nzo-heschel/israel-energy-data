@@ -1,4 +1,10 @@
 from contextlib import contextmanager
+import ssl
+
+# Python 3.15 removed deprecated ssl.PROTOCOL_TLSv1* constants still referenced by mysql-connector-python
+for _attr in ("PROTOCOL_TLSv1", "PROTOCOL_TLSv1_1", "PROTOCOL_TLSv1_2"):
+    if not hasattr(ssl, _attr):
+        setattr(ssl, _attr, ssl.PROTOCOL_TLS)
 
 from mysql.connector.pooling import MySQLConnectionPool
 
