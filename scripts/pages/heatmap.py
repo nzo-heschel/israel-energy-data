@@ -2,8 +2,10 @@ from dash import dcc, html, Input, Output, State, callback_context
 from dash.exceptions import PreventUpdate
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 import logging
+import time as time_module
 import pandas as pd
 
 from scripts import utils
@@ -61,20 +63,28 @@ def retrieve_data():
         logging.info("Time since last call: {} seconds. No URL call.".format(int(time_since_last_call.total_seconds())))
         return
 
+    t_start = time_module.perf_counter()
     today = datetime.now()
     start_year = datetime.strptime(start_date, "%d-%m-%Y").year
     end_year = today.year
+    years = list(range(start_year, end_year + 1))
 
-    d2 = {}
-    latest_date = None
-    for yr in range(start_year, end_year + 1):
+    def fetch_year(yr):
         chunk_start = start_date if yr == start_year else f"01-01-{yr}"
         chunk_end = today.strftime("%d-%m-%Y") if yr == end_year else f"31-12-{yr}"
         heatmap_url = (
             f'http://0.0.0.0:9999/get?source=noga2&type=energy'
             f'&start_date={chunk_start}&end_date={chunk_end}&time=all&format=bin'
         )
-        json_list = utils.retrieve_url(heatmap_url)
+        return utils.retrieve_url(heatmap_url)
+
+    with ThreadPoolExecutor(max_workers=len(years)) as executor:
+        year_results = list(executor.map(fetch_year, years))
+    t_fetched = time_module.perf_counter()
+
+    d2 = {}
+    latest_date = None
+    for json_list in year_results:
         if not json_list or "noga2.energy" not in json_list:
             continue
         sorted_items = sorted(
@@ -82,7 +92,6 @@ def retrieve_data():
              for d_str, time_dict in json_list["noga2.energy"].items()),
             key=lambda x: x[0]
         )
-        del json_list
         for date, time_dict in sorted_items:
             latest_date = date
             for time, sources_dict in time_dict.items():
@@ -94,7 +103,7 @@ def retrieve_data():
                 for source, value in sources_dict.items():
                     s = "Diesel" if source == "Solar" else source
                     d2.setdefault(s, {}).setdefault(date, {})[time] = value
-        del sorted_items
+    del year_results
 
     if latest_date is None:
         return
@@ -112,6 +121,11 @@ def retrieve_data():
     dfs_zero = pd.DataFrame(0, index=dfs[select_source].index, columns=dfs[select_source].columns)
     sources = [s for s in list(d2.keys()) if s not in ["DemandManagement", "Renewables"]]
     last_call = datetime.now()
+    t_done = time_module.perf_counter()
+    logging.info(
+        "heatmap.retrieve_data completed: fetch=%.2fs | dataframe_build=%.2fs | total=%.2fs",
+        t_fetched - t_start, t_done - t_fetched, t_done - t_start
+    )
 
 
 def compute_percent_df(source_df, demand_df):

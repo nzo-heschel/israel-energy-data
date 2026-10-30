@@ -1,4 +1,6 @@
 from contextlib import contextmanager
+import logging
+import time as time_module
 
 from scripts.storage.storage_top import Storage, fix_date, unfix_date, unfix_time, dict_key_value
 
@@ -98,8 +100,16 @@ class SqlStorageTemplate(Storage):
                      (self.SQL_AND_TIME if time != "all" else "") +
                      (self.SQL_AND_TAG if tag else "")) \
                 .format(namespace=namespace, time=time, tag=tag)
+        t0 = time_module.perf_counter()
         records = self._get_records(query)
-        return self._records_to_dict(records)
+        t1 = time_module.perf_counter()
+        res = self._records_to_dict(records)
+        t2 = time_module.perf_counter()
+        logging.info(
+            "SQL _retrieve(%s, %s..%s): %d rows | _get_records=%.2fs | _records_to_dict=%.2fs",
+            namespace, date or date_from, date or date_to, len(records), t1 - t0, t2 - t1
+        )
+        return res
 
     def _records_to_dict(self, records):
         d = {}
