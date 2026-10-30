@@ -3,10 +3,12 @@ from dash.exceptions import PreventUpdate
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from datetime import datetime
+import gc
 import logging
+import time as time_module
 import pandas as pd
 
-from scripts import utils
+from scripts import server, utils
 
 HEATMAP_ID = "heatmap-graph"
 SOURCES_ID = "sources-radioitems"
@@ -61,35 +63,26 @@ def retrieve_data():
         logging.info("Time since last call: {} seconds. No URL call.".format(int(time_since_last_call.total_seconds())))
         return
 
-    heatmap_url = f'http://0.0.0.0:9999/get?source=noga2&type=energy&start_date={start_date}&time=all&format=bin'
-    json_list = utils.retrieve_url(heatmap_url)
-    e = dict(sorted(json_list["noga2.energy"].items(), key=lambda d: datetime.strptime(d[0], "%d-%m-%Y")))
-    d2 = {}
-    date = None
-    for _date, time_dict in e.items():
-        date = datetime.strptime(_date, "%d-%m-%Y")
-        for time, sources_dict in time_dict.items():
-            # Noga has spurious data on 03-07-2025,14:36 and 28-05-2024,12:18
-            if time == '12:18':
-                time = '12:15'  # No data for 12:15 so use 12:18 instead.
-            if time == '14:36':
-                continue  # There are points for 14:35 and 14:40, so just skip it.
-            for source, value in sources_dict.items():
-                s = "Diesel" if source == "Solar" else source
-                d2.setdefault(s, {}).setdefault(date, {})[time] = value
-    start_date = date.strftime("%d-%m-%Y")
-    for source, date_dict in d2.items():
-        df = pd.DataFrame(date_dict).fillna(0)
-        df.index.name = "Time"
-        df.columns.name = "Date"
-        df = df.reindex(sorted(df.columns), axis=1).sort_index()
+    t_start = time_module.perf_counter()
+    heatmap_url = 'http://0.0.0.0:9999/get?source=noga2&type=energy&start_date=' + start_date + '&time=all&format=bin'
+    utils.retrieve_url(heatmap_url)
+    fetched_dfs, latest_date = server.pop_df_result()
+    if latest_date is None or not fetched_dfs:
+        return
+
+    start_date = latest_date.strftime("%d-%m-%Y")
+    for source, df in fetched_dfs.items():
         if source in dfs:
             dfs[source] = df.combine_first(dfs[source])
         else:
             dfs[source] = df
-    dfs_zero = pd.DataFrame(0, index=dfs[select_source].index, columns=dfs[select_source].columns)
-    sources = [s for s in list(d2.keys()) if s not in ["DemandManagement", "Renewables"]]
+    del fetched_dfs
+    gc.collect()
+    dfs_zero = pd.DataFrame(0, index=dfs[select_source].index, columns=dfs[select_source].columns, dtype='float32')
+    sources = [s for s in list(dfs.keys()) if s not in ["DemandManagement", "Renewables"]]
     last_call = datetime.now()
+    t_done = time_module.perf_counter()
+    logging.info("heatmap.retrieve_data completed: total=%.2fs", t_done - t_start)
 
 
 def compute_percent_df(source_df, demand_df):

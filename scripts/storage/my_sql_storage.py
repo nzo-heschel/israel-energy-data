@@ -1,17 +1,18 @@
 from contextlib import contextmanager
-import ssl
-
-# Python 3.15 removed deprecated ssl.PROTOCOL_TLSv1* constants still referenced by mysql-connector-python
-for _attr in ("PROTOCOL_TLSv1", "PROTOCOL_TLSv1_1", "PROTOCOL_TLSv1_2"):
-    if not hasattr(ssl, _attr):
-        setattr(ssl, _attr, ssl.PROTOCOL_TLS)
-
-from mysql.connector.pooling import MySQLConnectionPool
-
-from scripts.storage.sql_storage import SqlStorageTemplate
+import queue
+import MySQLdb
+import MySQLdb.cursors
+from MySQLdb import constants, converters
 from furl import furl
 
+from scripts.storage.sql_storage import SqlStorageTemplate
+
 energy_db_name = "energy_data"
+
+# Return DATE and TIME columns as strings directly from C instead of allocating datetime.date/timedelta objects
+_FAST_CONVERSIONS = converters.conversions.copy()
+_FAST_CONVERSIONS[constants.FIELD_TYPE.DATE] = str
+_FAST_CONVERSIONS[constants.FIELD_TYPE.TIME] = str
 
 
 class MySqlStorage(SqlStorageTemplate):
@@ -31,34 +32,52 @@ class MySqlStorage(SqlStorageTemplate):
 
     def __init__(self, uri):
         self.url = furl(uri)
-        self.pool = self._init_pool()
+        self._database = None
+        self._pool = queue.LifoQueue(maxsize=5)
         self._execute_query("CREATE DATABASE IF NOT EXISTS energy_data")
-        self.pool = self._init_pool(database=energy_db_name)
+        self._database = energy_db_name
+        self._pool = queue.LifoQueue(maxsize=5)
         self._execute_query(self.SQL_CREATE_TABLE)
 
-    def _init_pool(self, database=None):
-        user = self.url.username
-        password = self.url.password
-        host = self.url.host
-        port = self.url.port or 3306
-        db_config = {
-            "user": user,
-            "password": password,
+    def _create_conn(self):
+        host = self.url.host or "127.0.0.1"
+        if host == "localhost":
+            host = "127.0.0.1"
+        kwargs = {
+            "user": self.url.username or "root",
+            "passwd": self.url.password or "",
             "host": host,
-            "port": port
+            "port": self.url.port or 3306,
+            "charset": "utf8mb4",
+            "conv": _FAST_CONVERSIONS,
+            "autocommit": False,
         }
-        if database:
-            db_config["database"] = database
-        return MySQLConnectionPool(pool_name="mysql_pool", pool_size=5, **db_config)
+        if self._database:
+            kwargs["db"] = self._database
+        return MySQLdb.connect(**kwargs)
 
     @contextmanager
     def _managed_cursor(self, commit=False):
-        conn = self.pool.get_connection()
-        cursor = conn.cursor()
+        try:
+            conn = self._pool.get_nowait()
+            conn.ping()
+        except queue.Empty:
+            conn = self._create_conn()
+        except Exception:
+            conn = self._create_conn()
+
+        cursor_cls = MySQLdb.cursors.Cursor if commit else MySQLdb.cursors.SSCursor
+        cursor = conn.cursor(cursor_cls)
         try:
             yield cursor
             if commit:
                 conn.commit()
         finally:
-            cursor.close()
-            conn.close()
+            try:
+                cursor.close()
+            except Exception:
+                pass
+            try:
+                self._pool.put_nowait(conn)
+            except queue.Full:
+                conn.close()
