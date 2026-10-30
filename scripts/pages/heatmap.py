@@ -77,11 +77,13 @@ def retrieve_data():
         chunk_end = curr_end.strftime("%d-%m-%Y")
         curr_start = curr_end + relativedelta(days=1)
 
+        t_chunk0 = time_module.perf_counter()
         heatmap_url = (
             f'http://0.0.0.0:9999/get?source=noga2&type=energy'
             f'&start_date={chunk_start}&end_date={chunk_end}&time=all&format=bin'
         )
         json_list = utils.retrieve_url(heatmap_url)
+        t_chunk_http = time_module.perf_counter()
         if not json_list or "noga2.energy" not in json_list or not json_list["noga2.energy"]:
             del json_list
             continue
@@ -112,6 +114,11 @@ def retrieve_data():
             chunk_dfs_by_source.setdefault(source, []).append(chunk_df)
         del d2_chunk
         gc.collect()
+        t_chunk_df = time_module.perf_counter()
+        logging.info(
+            "Chunk %s..%s: http=%.2fs | df_slice=%.2fs",
+            chunk_start, chunk_end, t_chunk_http - t_chunk0, t_chunk_df - t_chunk_http
+        )
 
     t_fetched = time_module.perf_counter()
 

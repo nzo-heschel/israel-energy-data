@@ -117,9 +117,17 @@ class SqlStorageTemplate(Storage):
                     if not rows:
                         break
                     row_count += len(rows)
+                    ns_Cache = {}
+                    tag_cache = {}
                     for ns_val, dt_val, tm_val, tag_val, value in rows:
-                        ns_str = ns_val.decode("utf-8") if isinstance(ns_val, (bytes, bytearray)) else ns_val
-                        tag_str = tag_val.decode("utf-8") if isinstance(tag_val, (bytes, bytearray)) else tag_val
+                        try:
+                            ns_str = ns_Cache[ns_val]
+                        except KeyError:
+                            ns_str = ns_Cache[ns_val] = ns_val.decode("utf-8") if isinstance(ns_val, (bytes, bytearray)) else ns_val
+                        try:
+                            tag_str = tag_cache[tag_val]
+                        except KeyError:
+                            tag_str = tag_cache[tag_val] = tag_val.decode("utf-8") if isinstance(tag_val, (bytes, bytearray)) else tag_val
                         val_num = float(value) if value is not None else None
                         try:
                             date_str = date_cache[dt_val]
