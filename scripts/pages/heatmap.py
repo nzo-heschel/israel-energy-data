@@ -2,8 +2,9 @@ from dash import dcc, html, Input, Output, State, callback_context
 from dash.exceptions import PreventUpdate
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
+from dateutil.relativedelta import relativedelta
+import gc
 import logging
 import time as time_module
 import pandas as pd
@@ -65,33 +66,34 @@ def retrieve_data():
 
     t_start = time_module.perf_counter()
     today = datetime.now()
-    start_year = datetime.strptime(start_date, "%d-%m-%Y").year
-    end_year = today.year
-    years = list(range(start_year, end_year + 1))
+    curr_start = datetime.strptime(start_date, "%d-%m-%Y")
 
-    def fetch_year(yr):
-        chunk_start = start_date if yr == start_year else f"01-01-{yr}"
-        chunk_end = today.strftime("%d-%m-%Y") if yr == end_year else f"31-12-{yr}"
+    latest_date = None
+    chunk_dfs_by_source = {}
+
+    while curr_start <= today:
+        curr_end = min(curr_start + relativedelta(months=3, days=-1), today)
+        chunk_start = curr_start.strftime("%d-%m-%Y")
+        chunk_end = curr_end.strftime("%d-%m-%Y")
+        curr_start = curr_end + relativedelta(days=1)
+
         heatmap_url = (
             f'http://0.0.0.0:9999/get?source=noga2&type=energy'
             f'&start_date={chunk_start}&end_date={chunk_end}&time=all&format=bin'
         )
-        return utils.retrieve_url(heatmap_url)
-
-    with ThreadPoolExecutor(max_workers=len(years)) as executor:
-        year_results = list(executor.map(fetch_year, years))
-    t_fetched = time_module.perf_counter()
-
-    d2 = {}
-    latest_date = None
-    for json_list in year_results:
-        if not json_list or "noga2.energy" not in json_list:
+        json_list = utils.retrieve_url(heatmap_url)
+        if not json_list or "noga2.energy" not in json_list or not json_list["noga2.energy"]:
+            del json_list
             continue
+
         sorted_items = sorted(
             ((datetime.strptime(d_str, "%d-%m-%Y"), time_dict)
              for d_str, time_dict in json_list["noga2.energy"].items()),
             key=lambda x: x[0]
         )
+        del json_list
+
+        d2_chunk = {}
         for date, time_dict in sorted_items:
             latest_date = date
             for time, sources_dict in time_dict.items():
@@ -102,15 +104,25 @@ def retrieve_data():
                     continue  # There are points for 14:35 and 14:40, so just skip it.
                 for source, value in sources_dict.items():
                     s = "Diesel" if source == "Solar" else source
-                    d2.setdefault(s, {}).setdefault(date, {})[time] = value
-    del year_results
+                    d2_chunk.setdefault(s, {}).setdefault(date, {})[time] = value
+        del sorted_items
+
+        for source, date_dict in d2_chunk.items():
+            chunk_df = pd.DataFrame(date_dict, dtype='float32').fillna(0)
+            chunk_dfs_by_source.setdefault(source, []).append(chunk_df)
+        del d2_chunk
+        gc.collect()
+
+    t_fetched = time_module.perf_counter()
 
     if latest_date is None:
         return
 
     start_date = latest_date.strftime("%d-%m-%Y")
-    for source, date_dict in d2.items():
-        df = pd.DataFrame(date_dict).fillna(0)
+    for source, df_list in list(chunk_dfs_by_source.items()):
+        df = pd.concat(df_list, axis=1).fillna(0)
+        del chunk_dfs_by_source[source], df_list
+        df = df.loc[:, ~df.columns.duplicated(keep='last')]
         df.index.name = "Time"
         df.columns.name = "Date"
         df = df.reindex(sorted(df.columns), axis=1).sort_index()
@@ -118,12 +130,13 @@ def retrieve_data():
             dfs[source] = df.combine_first(dfs[source])
         else:
             dfs[source] = df
-    dfs_zero = pd.DataFrame(0, index=dfs[select_source].index, columns=dfs[select_source].columns)
-    sources = [s for s in list(d2.keys()) if s not in ["DemandManagement", "Renewables"]]
+    gc.collect()
+    dfs_zero = pd.DataFrame(0, index=dfs[select_source].index, columns=dfs[select_source].columns, dtype='float32')
+    sources = [s for s in list(dfs.keys()) if s not in ["DemandManagement", "Renewables"]]
     last_call = datetime.now()
     t_done = time_module.perf_counter()
     logging.info(
-        "heatmap.retrieve_data completed: fetch=%.2fs | dataframe_build=%.2fs | total=%.2fs",
+        "heatmap.retrieve_data completed: fetch_and_chunk=%.2fs | concat=%.2fs | total=%.2fs",
         t_fetched - t_start, t_done - t_fetched, t_done - t_start
     )
 

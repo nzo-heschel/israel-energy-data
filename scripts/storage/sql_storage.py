@@ -101,15 +101,37 @@ class SqlStorageTemplate(Storage):
                      (self.SQL_AND_TAG if tag else "")) \
                 .format(namespace=namespace, time=time, tag=tag)
         t0 = time_module.perf_counter()
-        records = self._get_records(query)
+        d = {}
+        date_cache = {}
+        time_cache = {}
+        row_count = 0
+        with self._managed_cursor() as curr:
+            curr.execute(query)
+            while True:
+                batch = curr.fetchmany(50000)
+                if not batch:
+                    break
+                row_count += len(batch)
+                for ns_val, dt_val, tm_val, tag_val, value in batch:
+                    try:
+                        date_str = date_cache[dt_val]
+                    except KeyError:
+                        date_str = date_cache[dt_val] = unfix_date(dt_val)
+                    try:
+                        time_str = time_cache[tm_val]
+                    except KeyError:
+                        time_str = time_cache[tm_val] = unfix_time(tm_val)
+                    try:
+                        d[ns_val][date_str][time_str][tag_val] = value
+                    except KeyError:
+                        d.setdefault(ns_val, {}).setdefault(date_str, {}).setdefault(time_str, {})[tag_val] = value
+                del batch
         t1 = time_module.perf_counter()
-        res = self._records_to_dict(records)
-        t2 = time_module.perf_counter()
         logging.info(
-            "SQL _retrieve(%s, %s..%s): %d rows | _get_records=%.2fs | _records_to_dict=%.2fs",
-            namespace, date or date_from, date or date_to, len(records), t1 - t0, t2 - t1
+            "SQL _retrieve(%s, %s..%s): %d rows in %.2fs",
+            namespace, date or date_from, date or date_to, row_count, t1 - t0
         )
-        return res
+        return d
 
     def _records_to_dict(self, records):
         d = {}
