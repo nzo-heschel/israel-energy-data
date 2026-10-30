@@ -1,15 +1,54 @@
 from contextlib import contextmanager
 import ssl
+import struct
 
 # Python 3.15 removed deprecated ssl.PROTOCOL_TLSv1* constants still referenced by mysql-connector-python
 for _attr in ("PROTOCOL_TLSv1", "PROTOCOL_TLSv1_1", "PROTOCOL_TLSv1_2"):
     if not hasattr(ssl, _attr):
         setattr(ssl, _attr, ssl.PROTOCOL_TLS)
 
+from mysql.connector.network import NetworkBrokerPlain, MySQLSocket
+from mysql.connector.errors import InterfaceError, OperationalError, ReadTimeoutError
 from mysql.connector.pooling import MySQLConnectionPool
 
 from scripts.storage.sql_storage import SqlStorageTemplate
 from furl import furl
+
+# Buffer MySQL socket reads with a 64KB BufferedReader and avoid per-row settimeout syscalls
+def _buffered_broker_recv(self, sock, address):
+    try:
+        rfile = getattr(sock, "_rfile", None)
+        if rfile is None or rfile.closed:
+            rfile = sock.makefile("rb", 65536)
+            sock._rfile = rfile
+        header = rfile.read(4)
+        if len(header) < 4:
+            raise InterfaceError(errno=2013)
+        payload_len = header[0] | (header[1] << 8) | (header[2] << 16)
+        self._pktnr = header[3]
+        payload = rfile.read(payload_len)
+        if len(payload) < payload_len:
+            raise InterfaceError(errno=2013)
+        return bytearray(header + payload)
+    except (TimeoutError,) as err:
+        raise ReadTimeoutError(errno=3024, msg=str(err)) from err
+    except OSError as err:
+        raise OperationalError(errno=2055, values=(address, str(err))) from err
+
+
+def _fast_socket_recv(self, read_timeout=None):
+    if read_timeout != getattr(self, "_last_read_timeout", object()):
+        try:
+            if not self._connection_timeout and self.sock is not None:
+                self.sock.settimeout(float(read_timeout) if read_timeout else None)
+                self._last_read_timeout = read_timeout
+        except OSError:
+            pass
+    return self._netbroker.recv(self.sock, self.address)
+
+
+NetworkBrokerPlain.recv = _buffered_broker_recv
+MySQLSocket.recv = _fast_socket_recv
 
 energy_db_name = "energy_data"
 

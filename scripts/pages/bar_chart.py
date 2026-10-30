@@ -7,6 +7,7 @@ from collections import defaultdict
 from typing import Dict, List, Tuple, Optional, Any
 
 from scripts import utils, noga
+from . import heatmap
 
 MAIN_GRAPH_ID = "main-graph"
 YEAR_RANGE_SLIDER = "year-range-slider"
@@ -50,38 +51,52 @@ def retrieve_data() -> Tuple[Dict[str, Any], int]:
     if cached_year_data:
         cost_data_all.update(cached_year_data)
 
-    json_demand = utils.retrieve_url(NEW_DATA_DEMAND_URL)
-    json_ren = utils.retrieve_url(NEW_DATA_REN_URL)
+    if "ActualDemand" in heatmap.dfs and "RenewableSum" in heatmap.dfs:
+        demand_monthly = heatmap.dfs["ActualDemand"].sum().groupby(lambda dt: f"01-{dt.month:02d}-{dt.year}").sum()
+        ren_monthly = heatmap.dfs["RenewableSum"].sum().groupby(lambda dt: f"01-{dt.month:02d}-{dt.year}").sum()
+        logging.info(f"Computing bar_chart 2024+ data from heatmap.dfs ({len(demand_monthly)} months)")
+        for date, demand_val in demand_monthly.items():
+            if date in ren_monthly:
+                demand = float(demand_val) / 6
+                renewable = float(ren_monthly[date]) / 6
+                conventional = demand - renewable
+                if date not in cost_data_all:
+                    cost_data_all[date] = {"00:00": {}}
+                cost_data_all[date]["00:00"][noga.COST_REN] = renewable
+                cost_data_all[date]["00:00"][noga.COST_CONV] = conventional
+    else:
+        json_demand = utils.retrieve_url(NEW_DATA_DEMAND_URL)
+        json_ren = utils.retrieve_url(NEW_DATA_REN_URL)
 
-    if json_demand and json_ren:
-        demand_data = json_demand.get("noga2.energy", {})
-        ren_data = json_ren.get("noga2.energy", {})
-        logging.info(f"Processing new data. Demand items: {len(demand_data)}, Ren items: {len(ren_data)}")
-        
-        for date, time_dict in demand_data.items():
-            try:
-                if date in ren_data:
-                    demand_tags = time_dict.get("00:00", {})
-                    ren_tags = ren_data[date].get("00:00", {})
+        if json_demand and json_ren:
+            demand_data = json_demand.get("noga2.energy", {})
+            ren_data = json_ren.get("noga2.energy", {})
+            logging.info(f"Processing new data. Demand items: {len(demand_data)}, Ren items: {len(ren_data)}")
+            
+            for date, time_dict in demand_data.items():
+                try:
+                    if date in ren_data:
+                        demand_tags = time_dict.get("00:00", {})
+                        ren_tags = ren_data[date].get("00:00", {})
 
-                    demand_val = demand_tags.get("ActualDemand")
-                    ren_val = ren_tags.get("RenewableSum")
-                    
-                    if demand_val is not None and ren_val is not None:
-                        # Factor adjustment: divide by 6 so that * 0.5 / 1000 results in / 12 / 1000
-                        demand = float(demand_val) / 6
-                        renewable = float(ren_val) / 6
-                        conventional = demand - renewable
+                        demand_val = demand_tags.get("ActualDemand")
+                        ren_val = ren_tags.get("RenewableSum")
                         
-                        if date not in cost_data_all:
-                            cost_data_all[date] = {"00:00": {}}
-                        cost_data_all[date]["00:00"][noga.COST_REN] = renewable
-                        cost_data_all[date]["00:00"][noga.COST_CONV] = conventional
-                    else:
-                        logging.debug(f"Missing data for {date}. Demand: {demand_val}, Ren: {ren_val}")
+                        if demand_val is not None and ren_val is not None:
+                            # Factor adjustment: divide by 6 so that * 0.5 / 1000 results in / 12 / 1000
+                            demand = float(demand_val) / 6
+                            renewable = float(ren_val) / 6
+                            conventional = demand - renewable
+                            
+                            if date not in cost_data_all:
+                                cost_data_all[date] = {"00:00": {}}
+                            cost_data_all[date]["00:00"][noga.COST_REN] = renewable
+                            cost_data_all[date]["00:00"][noga.COST_CONV] = conventional
+                        else:
+                            logging.debug(f"Missing data for {date}. Demand: {demand_val}, Ren: {ren_val}")
 
-            except (KeyError, ValueError) as e:
-                logging.warning(f"Error processing new data for {date}: {e}")
+                except (KeyError, ValueError) as e:
+                    logging.warning(f"Error processing new data for {date}: {e}")
 
     if not cost_data_all:
         return cached_data if cached_data is not None else {}, last_max_year
