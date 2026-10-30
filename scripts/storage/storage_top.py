@@ -30,6 +30,10 @@ class Storage:
         """Retrieve values for the given range of dates."""
         pass
 
+    def retrieve_tag_dataframes(self, namespace, from_date, to_date):
+        """Retrieve (Time x Date) float32 DataFrames keyed by tag, and the latest date."""
+        pass
+
     def latest_date(self, namespace):
         pass
 

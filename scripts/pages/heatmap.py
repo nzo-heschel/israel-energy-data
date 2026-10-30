@@ -3,13 +3,12 @@ from dash.exceptions import PreventUpdate
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from datetime import datetime
-from dateutil.relativedelta import relativedelta
 import gc
 import logging
 import time as time_module
 import pandas as pd
 
-from scripts import utils
+from scripts import server
 
 HEATMAP_ID = "heatmap-graph"
 SOURCES_ID = "sources-radioitems"
@@ -65,87 +64,24 @@ def retrieve_data():
         return
 
     t_start = time_module.perf_counter()
-    today = datetime.now()
-    curr_start = datetime.strptime(start_date, "%d-%m-%Y")
-
-    latest_date = None
-    chunk_dfs_by_source = {}
-
-    while curr_start <= today:
-        curr_end = min(curr_start + relativedelta(months=3, days=-1), today)
-        chunk_start = curr_start.strftime("%d-%m-%Y")
-        chunk_end = curr_end.strftime("%d-%m-%Y")
-        curr_start = curr_end + relativedelta(days=1)
-
-        t_chunk0 = time_module.perf_counter()
-        heatmap_url = (
-            f'http://0.0.0.0:9999/get?source=noga2&type=energy'
-            f'&start_date={chunk_start}&end_date={chunk_end}&time=all&format=bin'
-        )
-        json_list = utils.retrieve_url(heatmap_url)
-        t_chunk_http = time_module.perf_counter()
-        if not json_list or "noga2.energy" not in json_list or not json_list["noga2.energy"]:
-            del json_list
-            continue
-
-        sorted_items = sorted(
-            ((datetime.strptime(d_str, "%d-%m-%Y"), time_dict)
-             for d_str, time_dict in json_list["noga2.energy"].items()),
-            key=lambda x: x[0]
-        )
-        del json_list
-
-        d2_chunk = {}
-        for date, time_dict in sorted_items:
-            latest_date = date
-            for time, sources_dict in time_dict.items():
-                # Noga has spurious data on 03-07-2025,14:36 and 28-05-2024,12:18
-                if time == '12:18':
-                    time = '12:15'  # No data for 12:15 so use 12:18 instead.
-                if time == '14:36':
-                    continue  # There are points for 14:35 and 14:40, so just skip it.
-                for source, value in sources_dict.items():
-                    s = "Diesel" if source == "Solar" else source
-                    d2_chunk.setdefault(s, {}).setdefault(date, {})[time] = value
-        del sorted_items
-
-        for source, date_dict in d2_chunk.items():
-            chunk_df = pd.DataFrame(date_dict, dtype='float32').fillna(0)
-            chunk_dfs_by_source.setdefault(source, []).append(chunk_df)
-        del d2_chunk
-        gc.collect()
-        t_chunk_df = time_module.perf_counter()
-        logging.info(
-            "Chunk %s..%s: http=%.2fs | df_slice=%.2fs",
-            chunk_start, chunk_end, t_chunk_http - t_chunk0, t_chunk_df - t_chunk_http
-        )
-
-    t_fetched = time_module.perf_counter()
-
-    if latest_date is None:
+    today_str = datetime.now().strftime("%d-%m-%Y")
+    fetched_dfs, latest_date = server.store.retrieve_tag_dataframes("noga2.energy", start_date, today_str)
+    if latest_date is None or not fetched_dfs:
         return
 
     start_date = latest_date.strftime("%d-%m-%Y")
-    for source, df_list in list(chunk_dfs_by_source.items()):
-        df = pd.concat(df_list, axis=1).fillna(0)
-        del chunk_dfs_by_source[source], df_list
-        df = df.loc[:, ~df.columns.duplicated(keep='last')]
-        df.index.name = "Time"
-        df.columns.name = "Date"
-        df = df.reindex(sorted(df.columns), axis=1).sort_index()
+    for source, df in fetched_dfs.items():
         if source in dfs:
             dfs[source] = df.combine_first(dfs[source])
         else:
             dfs[source] = df
+    del fetched_dfs
     gc.collect()
     dfs_zero = pd.DataFrame(0, index=dfs[select_source].index, columns=dfs[select_source].columns, dtype='float32')
     sources = [s for s in list(dfs.keys()) if s not in ["DemandManagement", "Renewables"]]
     last_call = datetime.now()
     t_done = time_module.perf_counter()
-    logging.info(
-        "heatmap.retrieve_data completed: fetch_and_chunk=%.2fs | concat=%.2fs | total=%.2fs",
-        t_fetched - t_start, t_done - t_fetched, t_done - t_start
-    )
+    logging.info("heatmap.retrieve_data completed: total=%.2fs", t_done - t_start)
 
 
 def compute_percent_df(source_df, demand_df):

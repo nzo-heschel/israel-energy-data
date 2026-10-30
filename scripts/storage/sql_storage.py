@@ -1,6 +1,9 @@
 from contextlib import contextmanager
+from datetime import datetime, time as dt_time, timedelta
 import logging
 import time as time_module
+import numpy as np
+import pandas as pd
 
 from scripts.storage.storage_top import Storage, fix_date, unfix_date, unfix_time, dict_key_value
 
@@ -15,6 +18,8 @@ class SqlStorageTemplate(Storage):
 
     SQL_RETRIEVE = "SELECT * FROM main_table " \
                    "WHERE namespace = '{namespace}'"
+    SQL_RETRIEVE_COLUMNS = "SELECT date, time, tag, value FROM main_table " \
+                           "WHERE namespace = '{namespace}'"
 
     SQL_LATEST_DATE = "SELECT max(date) from main_table WHERE namespace = '{namespace}'"
 
@@ -67,6 +72,105 @@ class SqlStorageTemplate(Storage):
 
     def retrieve_range(self, namespace, from_date, to_date, tag=None, time="day"):
         return self._retrieve(namespace, date_from=fix_date(from_date), date_to=fix_date(to_date), tag=tag, time=time)
+
+    def retrieve_tag_dataframes(self, namespace, from_date, to_date):
+        fixed_from = fix_date(from_date)
+        fixed_to = fix_date(to_date)
+        start_dt = datetime.strptime(fixed_from, "%Y-%m-%d")
+        end_dt = datetime.strptime(fixed_to, "%Y-%m-%d")
+        max_days = (end_dt - start_dt).days + 1
+        if max_days <= 0:
+            return {}, None
+
+        all_dates = [start_dt + timedelta(days=i) for i in range(max_days)]
+        date_to_col = {}
+        for i, dt in enumerate(all_dates):
+            date_to_col[dt.strftime("%Y-%m-%d")] = i
+            date_to_col[dt.date()] = i
+
+        times_str = [f"{h:02d}:{m:02d}" for h in range(24) for m in range(0, 60, 5)]
+        time_to_row = {}
+        for idx, t in enumerate(times_str):
+            h, m = int(t[:2]), int(t[3:5])
+            time_to_row[t] = idx
+            time_to_row[f"{t}:00"] = idx
+            time_to_row[f"{h}:{m:02d}:00"] = idx
+            time_to_row[dt_time(h, m)] = idx
+        # Noga has spurious data on 28-05-2024,12:18 (no data for 12:15 so map 12:18 -> 12:15)
+        # and 03-07-2025,14:36 (omitted from time_to_row so it maps to None and is skipped)
+        r_1215 = time_to_row["12:15"]
+        time_to_row["12:18"] = r_1215
+        time_to_row["12:18:00"] = r_1215
+        time_to_row[dt_time(12, 18)] = r_1215
+
+        sql_and_date = self.SQL_AND_DATE_RANGE.format(from_date=fixed_from, to_date=fixed_to)
+        query = (self.SQL_RETRIEVE_COLUMNS + sql_and_date).format(namespace=namespace)
+
+        t0 = time_module.perf_counter()
+        seen_cols = [False] * max_days
+        arrays = {}
+        mvs = {}
+        row_count = 0
+        last_dt = None
+        last_tm = None
+        r = None
+        c = -1
+        flat_idx = None
+
+        with self._managed_cursor() as curr:
+            curr.execute(query)
+            while True:
+                batch = curr.fetchmany(50000)
+                if not batch:
+                    break
+                row_count += len(batch)
+                for dt_val, tm_val, tag_val, val in batch:
+                    if tm_val != last_tm:
+                        last_tm = tm_val
+                        r = time_to_row.get(tm_val)
+                        flat_idx = r * max_days + c if (r is not None and c >= 0) else None
+                    if dt_val != last_dt:
+                        last_dt = dt_val
+                        c = date_to_col.get(dt_val, -1)
+                        if c >= 0:
+                            seen_cols[c] = True
+                        flat_idx = r * max_days + c if (r is not None and c >= 0) else None
+                    try:
+                        mvs[tag_val][flat_idx] = val
+                    except KeyError:
+                        s = "Diesel" if tag_val == "Solar" else tag_val
+                        arr = arrays.get(s)
+                        if arr is None:
+                            arr = np.zeros((288, max_days), dtype=np.float32)
+                            arrays[s] = arr
+                            mvs[s] = memoryview(arr.ravel())
+                        mv = mvs[s]
+                        mvs[tag_val] = mv
+                        if flat_idx is not None and val is not None:
+                            mv[flat_idx] = val
+                    except TypeError:
+                        pass
+                del batch
+
+        valid_indices = [i for i, seen in enumerate(seen_cols) if seen]
+        if not valid_indices:
+            return {}, None
+
+        valid_dates = [all_dates[i] for i in valid_indices]
+        col_index = pd.Index(valid_dates, name="Date")
+        row_index = pd.Index(times_str, name="Time")
+
+        dfs_out = {}
+        for tag_val, arr in list(arrays.items()):
+            sliced = arr[:, valid_indices] if len(valid_indices) != max_days else arr
+            dfs_out[tag_val] = pd.DataFrame(sliced, index=row_index, columns=col_index, copy=False)
+
+        t1 = time_module.perf_counter()
+        logging.info(
+            "SQL retrieve_tag_dataframes(%s, %s..%s): %d rows -> %d DataFrames (%d days) in %.2fs",
+            namespace, fixed_from, fixed_to, row_count, len(dfs_out), len(valid_dates), t1 - t0
+        )
+        return dfs_out, valid_dates[-1]
 
     def latest_date(self, namespace):
         records = self._get_records(self.SQL_LATEST_DATE.format(namespace=namespace))

@@ -60,7 +60,7 @@ class MySqlStorage(SqlStorageTemplate):
     def _managed_cursor(self, commit=False):
         try:
             conn = self._pool.get_nowait()
-            conn.ping(True)
+            conn.ping()
         except queue.Empty:
             conn = self._create_conn()
         except Exception:
