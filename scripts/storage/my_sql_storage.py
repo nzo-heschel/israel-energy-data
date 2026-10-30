@@ -40,10 +40,13 @@ class MySqlStorage(SqlStorageTemplate):
         self._execute_query(self.SQL_CREATE_TABLE)
 
     def _create_conn(self):
+        host = self.url.host or "127.0.0.1"
+        if host == "localhost":
+            host = "127.0.0.1"
         kwargs = {
             "user": self.url.username or "root",
             "passwd": self.url.password or "",
-            "host": self.url.host or "localhost",
+            "host": host,
             "port": self.url.port or 3306,
             "charset": "utf8mb4",
             "conv": _FAST_CONVERSIONS,
