@@ -107,63 +107,25 @@ class SqlStorageTemplate(Storage):
         row_count = 0
         with self._managed_cursor() as curr:
             curr.execute(query)
-            if hasattr(curr, "_connection") and hasattr(curr._connection, "get_rows"):
-                while curr._have_unread_result():
-                    rows, eof = curr._connection.get_rows(
-                        count=50000, raw=True, read_timeout=curr._read_timeout
-                    )
-                    if eof is not None:
-                        curr._handle_eof(eof)
-                    if not rows:
-                        break
-                    row_count += len(rows)
-                    ns_Cache = {}
-                    tag_cache = {}
-                    for ns_val, dt_val, tm_val, tag_val, value in rows:
-                        try:
-                            ns_str = ns_Cache[ns_val]
-                        except KeyError:
-                            ns_str = ns_Cache[ns_val] = ns_val.decode("utf-8") if isinstance(ns_val, (bytes, bytearray)) else ns_val
-                        try:
-                            tag_str = tag_cache[tag_val]
-                        except KeyError:
-                            tag_str = tag_cache[tag_val] = tag_val.decode("utf-8") if isinstance(tag_val, (bytes, bytearray)) else tag_val
-                        val_num = float(value) if value is not None else None
-                        try:
-                            date_str = date_cache[dt_val]
-                        except KeyError:
-                            dt_s = dt_val.decode("utf-8") if isinstance(dt_val, (bytes, bytearray)) else dt_val
-                            date_str = date_cache[dt_val] = unfix_date(dt_s)
-                        try:
-                            time_str = time_cache[tm_val]
-                        except KeyError:
-                            tm_s = tm_val.decode("utf-8") if isinstance(tm_val, (bytes, bytearray)) else tm_val
-                            time_str = time_cache[tm_val] = unfix_time(tm_s)
-                        try:
-                            d[ns_str][date_str][time_str][tag_str] = val_num
-                        except KeyError:
-                            d.setdefault(ns_str, {}).setdefault(date_str, {}).setdefault(time_str, {})[tag_str] = val_num
-                    del rows
-            else:
-                while True:
-                    batch = curr.fetchmany(50000)
-                    if not batch:
-                        break
-                    row_count += len(batch)
-                    for ns_val, dt_val, tm_val, tag_val, value in batch:
-                        try:
-                            date_str = date_cache[dt_val]
-                        except KeyError:
-                            date_str = date_cache[dt_val] = unfix_date(dt_val)
-                        try:
-                            time_str = time_cache[tm_val]
-                        except KeyError:
-                            time_str = time_cache[tm_val] = unfix_time(tm_val)
-                        try:
-                            d[ns_val][date_str][time_str][tag_val] = value
-                        except KeyError:
-                            d.setdefault(ns_val, {}).setdefault(date_str, {}).setdefault(time_str, {})[tag_val] = value
-                    del batch
+            while True:
+                batch = curr.fetchmany(50000)
+                if not batch:
+                    break
+                row_count += len(batch)
+                for ns_val, dt_val, tm_val, tag_val, value in batch:
+                    try:
+                        date_str = date_cache[dt_val]
+                    except KeyError:
+                        date_str = date_cache[dt_val] = unfix_date(dt_val)
+                    try:
+                        time_str = time_cache[tm_val]
+                    except KeyError:
+                        time_str = time_cache[tm_val] = unfix_time(tm_val)
+                    try:
+                        d[ns_val][date_str][time_str][tag_val] = value
+                    except KeyError:
+                        d.setdefault(ns_val, {}).setdefault(date_str, {}).setdefault(time_str, {})[tag_val] = value
+                del batch
         t1 = time_module.perf_counter()
         logging.info(
             "SQL _retrieve(%s, %s..%s): %d rows in %.2fs",

@@ -2,11 +2,13 @@ FROM python:3.15-slim
 
 # Install dependencies and clean up apt cache
 RUN apt-get update && \
-    apt-get install -y cron curl && \
+    apt-get install -y cron curl default-libmysqlclient-dev pkg-config gcc && \
     rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt ./requirements.txt
-RUN pip install -r requirements.txt
+RUN pip install -r requirements.txt && \
+    apt-get purge -y gcc pkg-config && \
+    apt-get autoremove -y
 
 # Copy application scripts and resources
 COPY ./assets ./assets
