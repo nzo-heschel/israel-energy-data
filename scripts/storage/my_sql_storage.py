@@ -54,11 +54,20 @@ class MySqlStorage(SqlStorageTemplate):
     @contextmanager
     def _managed_cursor(self, commit=False):
         conn = self.pool.get_connection()
+        if not conn.is_connected():
+            conn.reconnect(attempts=3, delay=1)
         cursor = conn.cursor()
+        cursor.execute("SET SESSION net_write_timeout = 600, SESSION net_read_timeout = 600")
         try:
             yield cursor
             if commit:
                 conn.commit()
         finally:
-            cursor.close()
-            conn.close()
+            try:
+                cursor.close()
+            except Exception:
+                pass
+            try:
+                conn.close()
+            except Exception:
+                pass
