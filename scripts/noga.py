@@ -170,6 +170,17 @@ def get(store, source, noga_type, start_date, end_date, tag, time="hour"):
     return result
 
 
+def get_dataframes(store, source, noga_type, start_date, end_date, tag=None, time="all"):
+    noga_types = NOGA2_TYPE_MAPPING if noga_type == "all" else [noga_type] if noga_type else NOGA2_TYPE_MAPPING
+    start_date = start_date or one_month_ago()
+    logging.info("Retrieving %s data with type(s) %s from %s until %s with \"%s\" interval and tag \"%s\"",
+                 source, ", ".join(noga_types), start_date, end_date, time, tag)
+    key = f"{source}.{noga_type}"
+    dfs_out, latest_date, item_count = store.retrieve_tag_dataframes(key, start_date, end_date)
+    logging.info("Retrieved {} items of type {}".format(item_count, key))
+    return dfs_out, latest_date
+
+
 def one_month_ago():
     date = datetime.date.today() + relativedelta(months=-1)
     return date.strftime("%d-%m-%Y")

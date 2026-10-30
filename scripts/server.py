@@ -15,6 +15,14 @@ PORT = int(os.environ.get("PORT", 9999))
 SMP_DATE_FORMAT = "%d-%m-%Y"
 STORAGE_URI = os.environ.get('STORAGE_URI', "mysql://root:mysql_root_123@localhost:3306")
 store = storage.new_instance(STORAGE_URI)
+_latest_df_result = (None, None)
+
+
+def pop_df_result():
+    global _latest_df_result
+    res = _latest_df_result
+    _latest_df_result = (None, None)
+    return res
 
 app = Flask(__name__, template_folder='../resources')
 
@@ -75,8 +83,16 @@ def success():
 
 @app.route('/get')
 def get():
+    global _latest_df_result
     try:
         source, data_type, start_date, end_date, tag, result_format, time = query_variables(request.args)
+        if result_format == "bin" and source == "noga2" and data_type == "energy" and time == "all":
+            dfs_out, latest_date = noga.get_dataframes(
+                store, source, noga_type=data_type, start_date=start_date,
+                end_date=end_date, tag=tag, time=time
+            )
+            _latest_df_result = (dfs_out, latest_date)
+            return format_data({"in_memory_df": True}, result_format)
         data = {}
         if source == "noga" or source == "noga2":
             data = noga.get(store, source, noga_type=data_type, start_date=start_date,

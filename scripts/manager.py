@@ -28,5 +28,7 @@ def shcedule_mem_usage():
 # run the server and memory usage logging in threads
 threading.Thread(target=server.main).start()
 threading.Thread(target=shcedule_mem_usage).start()
+# wait for server to start
+time.sleep(1)
 # run the charts dash app in the main thread
 charts.main()

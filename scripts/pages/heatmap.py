@@ -8,7 +8,7 @@ import logging
 import time as time_module
 import pandas as pd
 
-from scripts import server
+from scripts import server, utils
 
 HEATMAP_ID = "heatmap-graph"
 SOURCES_ID = "sources-radioitems"
@@ -64,8 +64,9 @@ def retrieve_data():
         return
 
     t_start = time_module.perf_counter()
-    today_str = datetime.now().strftime("%d-%m-%Y")
-    fetched_dfs, latest_date = server.store.retrieve_tag_dataframes("noga2.energy", start_date, today_str)
+    heatmap_url = 'http://0.0.0.0:9999/get?source=noga2&type=energy&start_date=' + start_date + '&time=all&format=bin'
+    utils.retrieve_url(heatmap_url)
+    fetched_dfs, latest_date = server.pop_df_result()
     if latest_date is None or not fetched_dfs:
         return
 

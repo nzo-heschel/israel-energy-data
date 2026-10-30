@@ -6,7 +6,7 @@ import logging
 from collections import defaultdict
 from typing import Dict, List, Tuple, Optional, Any
 
-from scripts import utils, noga, server
+from scripts import utils, noga
 from . import heatmap
 
 MAIN_GRAPH_ID = "main-graph"
@@ -44,8 +44,8 @@ def retrieve_data() -> Tuple[Dict[str, Any], int]:
     
     if cached_year_data is None:
         # Old noga data is retrieved only once
-        json_list = server.store.retrieve_range("noga.cost", "01-01-2021", "31-12-2023", time="month")
-        if json_list and "noga.cost" in json_list:
+        json_list = utils.retrieve_url(YEAR_URL)
+        if json_list:
             cached_year_data = json_list["noga.cost"]
 
     if cached_year_data:

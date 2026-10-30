@@ -80,7 +80,7 @@ class SqlStorageTemplate(Storage):
         end_dt = datetime.strptime(fixed_to, "%Y-%m-%d")
         max_days = (end_dt - start_dt).days + 1
         if max_days <= 0:
-            return {}, None
+            return {}, None, 0
 
         all_dates = [start_dt + timedelta(days=i) for i in range(max_days)]
         date_to_col = {}
@@ -111,6 +111,7 @@ class SqlStorageTemplate(Storage):
         arrays = {}
         mvs = {}
         row_count = 0
+        item_count = 0
         last_dt = None
         last_tm = None
         r = None
@@ -128,13 +129,26 @@ class SqlStorageTemplate(Storage):
                     if tm_val != last_tm:
                         last_tm = tm_val
                         r = time_to_row.get(tm_val)
-                        flat_idx = r * max_days + c if (r is not None and c >= 0) else None
-                    if dt_val != last_dt:
+                        if dt_val != last_dt:
+                            last_dt = dt_val
+                            c = date_to_col.get(dt_val, -1)
+                            if c >= 0:
+                                seen_cols[c] = True
+                        if r is not None and c >= 0:
+                            flat_idx = r * max_days + c
+                            item_count += 1
+                        else:
+                            flat_idx = None
+                    elif dt_val != last_dt:
                         last_dt = dt_val
                         c = date_to_col.get(dt_val, -1)
                         if c >= 0:
                             seen_cols[c] = True
-                        flat_idx = r * max_days + c if (r is not None and c >= 0) else None
+                        if r is not None and c >= 0:
+                            flat_idx = r * max_days + c
+                            item_count += 1
+                        else:
+                            flat_idx = None
                     try:
                         mvs[tag_val][flat_idx] = val
                     except KeyError:
@@ -154,7 +168,7 @@ class SqlStorageTemplate(Storage):
 
         valid_indices = [i for i, seen in enumerate(seen_cols) if seen]
         if not valid_indices:
-            return {}, None
+            return {}, None, 0
 
         valid_dates = [all_dates[i] for i in valid_indices]
         col_index = pd.Index(valid_dates, name="Date")
@@ -170,7 +184,7 @@ class SqlStorageTemplate(Storage):
             "SQL retrieve_tag_dataframes(%s, %s..%s): %d rows -> %d DataFrames (%d days) in %.2fs",
             namespace, fixed_from, fixed_to, row_count, len(dfs_out), len(valid_dates), t1 - t0
         )
-        return dfs_out, valid_dates[-1]
+        return dfs_out, valid_dates[-1], item_count
 
     def latest_date(self, namespace):
         records = self._get_records(self.SQL_LATEST_DATE.format(namespace=namespace))
