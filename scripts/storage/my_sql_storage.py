@@ -17,10 +17,11 @@ from furl import furl
 # Buffer MySQL socket reads with a 64KB BufferedReader and avoid per-row settimeout syscalls
 def _buffered_broker_recv(self, sock, address):
     try:
-        rfile = getattr(sock, "_rfile", None)
-        if rfile is None or rfile.closed:
+        rfile = getattr(self, "_rfile", None)
+        if rfile is None or rfile.closed or getattr(self, "_rfile_sock", None) is not sock:
             rfile = sock.makefile("rb", 65536)
-            sock._rfile = rfile
+            self._rfile = rfile
+            self._rfile_sock = sock
         header = rfile.read(4)
         if len(header) < 4:
             raise InterfaceError(errno=2013)
