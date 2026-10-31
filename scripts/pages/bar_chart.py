@@ -11,6 +11,8 @@ from . import heatmap
 
 MAIN_GRAPH_ID = "main-graph"
 YEAR_RANGE_SLIDER = "year-range-slider"
+YEARLY_CHECKBOX_ID = "yearly-checkbox"
+YEARLY_VALUE = "Yearly"
 YEAR_FROM: int = 2021
 YEAR_TO: int = 2060  # excluding
 
@@ -140,10 +142,19 @@ def bar_chart_layout(nav_links):
                 marks={yr: str(yr) for yr in range(YEAR_FROM, last_max_year + 1)},
                 id=YEAR_RANGE_SLIDER),
         ],
-            style={'width': '50%', 'padding-left': '15%', 'display': 'inline-block'}),
+            style={'width': '50%', 'padding-left': '15%', 'display': 'inline-block', 'verticalAlign': 'middle'}),
+        html.Div([
+            dcc.Checklist(
+                id=YEARLY_CHECKBOX_ID,
+                options=[{'label': 'שנתי', 'value': YEARLY_VALUE}],
+                value=[],
+                style={'fontSize': 18}
+            ),
+        ],
+            style={'display': 'inline-block', 'padding-left': '5%', 'verticalAlign': 'middle'}),
     ])
 
-def bar_chart(cost_data_all: Dict, max_year: int, years_range: List[int]):
+def bar_chart(cost_data_all: Dict, max_year: int, years_range: List[int], yearly: bool = False):
     traces = []
     start_year, end_year = years_range if years_range else [YEAR_FROM, max_year]
 
@@ -157,7 +168,7 @@ def bar_chart(cost_data_all: Dict, max_year: int, years_range: List[int]):
     # Only iterate the years we actually need to display
     for yr in range(start_year, end_year + 1):
         year_data = data_by_year.get(yr, {})
-        trace_ren, trace_conv, total, total_ren = per_year_stacked_bar(year_data, yr)
+        trace_ren, trace_conv, total, total_ren = per_year_stacked_bar(year_data, yr, yearly=yearly)
         
         traces.append(trace_conv)
         traces.append(trace_ren)
@@ -166,7 +177,8 @@ def bar_chart(cost_data_all: Dict, max_year: int, years_range: List[int]):
     fig = go.Figure(data=traces,
                     layout=go.Layout(
                         height=800,  # showlegend=False,
-                        xaxis=go.layout.XAxis(title="", fixedrange=True, tickfont={"size": 18}),
+                        xaxis=go.layout.XAxis(title="", fixedrange=True, tickfont={"size": 18},
+                                              type="category" if yearly else None),
                         yaxis=go.layout.YAxis(title={"text": '[MWh] ייצור', "font":{"size": 18}},
                                               fixedrange=True,
                                               tickfont={"size": 18},
@@ -182,7 +194,7 @@ def bar_chart(cost_data_all: Dict, max_year: int, years_range: List[int]):
     fig.add_annotation(xref="paper", yref="paper", x=0, y=1, showarrow=False, text="מקור : נוגה", font={"size": 16})
     return fig
 
-def per_year_stacked_bar(cost_data: Dict, group: int):
+def per_year_stacked_bar(cost_data: Dict, group: int, yearly: bool = False):
     total = 0
     total_renewable = 0
     y_renewable = []
@@ -202,29 +214,49 @@ def per_year_stacked_bar(cost_data: Dict, group: int):
             y_text.append("{:.1%}".format(renewable / total_month))
         else:
             y_text.append("")
-    trace_ren = go.Bar(x=months_list, y=y_renewable,
-                       text=y_text, textposition="auto", textfont={"size": 48},
-                       offsetgroup=group,
+
+    if yearly:
+        x_vals = [str(group)]
+        y_ren_vals = [total_renewable]
+        y_conv_vals = [total - total_renewable]
+        y_text_vals = ["{:.1%}".format(total_renewable / total) if total > 0 else ""]
+        offset_grp = "yearly"
+        hover_ren = '<i>' + str(group) + ' Renewable</i>:<br>      %{y:,.0f} MWh<extra></extra>'
+        hover_conv = '<i>' + str(group) + ' Total</i>:<br>      %{y:,.0f} MWh<extra></extra>'
+    else:
+        x_vals = months_list
+        y_ren_vals = y_renewable
+        y_conv_vals = y_conventional
+        y_text_vals = y_text
+        offset_grp = group
+        hover_ren = '<i>%{x} ' + str(group) + ' Renewable</i>:<br>      %{y:,.0f} MWh'
+        hover_conv = '<i>%{x} ' + str(group) + ' Total</i>:<br>      %{y:,.0f} MWh'
+
+    trace_ren = go.Bar(x=x_vals, y=y_ren_vals,
+                       text=y_text_vals, textposition="outside", textfont={"size": 48},
+                       offsetgroup=offset_grp,
                        name=legend(group, total / 1e3, total_renewable / 1e3),
                        marker_color=bar_4[group % 4]["ren"],
                        legendgroup="ren",
                        legendgrouptitle={"text": "  מתחדשות  ", "font": {"size": 20}},
-                       hovertemplate='<i>%{x} ' + str(group) + ' Renewable</i>:<br>      %{y:,.0f} MWh')
-    trace_conv = go.Bar(x=months_list, y=y_conventional,
-                        offsetgroup=group, base=y_renewable,
+                       hovertemplate=hover_ren)
+    trace_conv = go.Bar(x=x_vals, y=y_conv_vals,
+                        offsetgroup=offset_grp, base=y_ren_vals,
                         name=legend(group, total / 1e3), marker_color=bar_4[group % 4]["conv"],
                         legendgroup="conv",
                         legendgrouptitle={"text": "   סך הכל   ", "font": {"size": 20}},
-                        hovertemplate='<i>%{x} ' + str(group) + ' Total</i>:<br>      %{y:,.0f} MWh')
+                        hovertemplate=hover_conv)
     return trace_ren, trace_conv, total, total_renewable
 
 
 def register_callbacks(app):
     @app.callback(
         Output(MAIN_GRAPH_ID, 'figure'),
-        Input(YEAR_RANGE_SLIDER, 'value'),
+        [Input(YEAR_RANGE_SLIDER, 'value'),
+         Input(YEARLY_CHECKBOX_ID, 'value')],
     )
-    def update_output(range_from_slider):
+    def update_output(range_from_slider, yearly_value):
+        yearly = YEARLY_VALUE in (yearly_value or [])
         response, max_year = retrieve_data()
-        fig = bar_chart(response, max_year, range_from_slider)
+        fig = bar_chart(response, max_year, range_from_slider, yearly=yearly)
         return fig
