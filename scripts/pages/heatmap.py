@@ -73,7 +73,13 @@ def retrieve_data():
     start_date = latest_date.strftime("%d-%m-%Y")
     for source, df in fetched_dfs.items():
         if source in dfs:
-            dfs[source] = df.combine_first(dfs[source])
+            old_df = dfs[source]
+            keep_cols = old_df.columns.difference(df.columns, sort=False)
+            merged = pd.concat([old_df[keep_cols], df], axis=1)
+            if not merged.columns.is_monotonic_increasing:
+                merged = merged.reindex(sorted(merged.columns), axis=1)
+            merged.columns.name = "Date"
+            dfs[source] = merged
         else:
             dfs[source] = df
     del fetched_dfs
