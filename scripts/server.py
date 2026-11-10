@@ -86,7 +86,7 @@ def get():
     global _latest_df_result
     try:
         source, data_type, start_date, end_date, tag, result_format, time = query_variables(request.args)
-        if result_format == "bin" and source == "noga2" and data_type == "energy" and time == "all":
+        if result_format == "bin" and source == "noga2" and data_type in ("energy", "co2emission") and time == "all":
             dfs_out, latest_date = noga.get_dataframes(
                 store, source, noga_type=data_type, start_date=start_date,
                 end_date=end_date, tag=tag, time=time
