@@ -1,5 +1,4 @@
-from dash import dcc, html, Input, Output, State, callback_context
-from dash.exceptions import PreventUpdate
+from dash import dcc, html, Input, Output, State
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from datetime import datetime
@@ -13,9 +12,7 @@ from . import heatmap
 
 CO2_HEATMAP_ID = "co2-heatmap-graph"
 CO2_SOURCES_ID = "co2-sources-radioitems"
-CO2_FREEZE_SCALE_ID = "co2-freeze-scale"
 CO2_DISPLAY_MODE_ID = "co2-display-mode-radioitems"
-FREEZE_SCALE_VALUE = "Freeze Scale"
 MODE_ABSOLUTE = "Absolute"
 MODE_PERCENT = "Percent"
 
@@ -74,10 +71,6 @@ GREEN_COLORSCALE = [
 
 dfs = {}
 sources = []
-
-global_freeze_source = None
-last_zrange = {MODE_ABSOLUTE: None, MODE_PERCENT: None}
-last_scatter_yrange = {MODE_ABSOLUTE: None, MODE_PERCENT: None}
 
 
 def retrieve_data():
@@ -151,20 +144,6 @@ def co2_layout(nav_links):
             id=CO2_HEATMAP_ID,
             style={'marginBottom': '0px'}
         ),
-        html.Div([
-            dcc.Checklist(id=CO2_FREEZE_SCALE_ID, options=[FREEZE_SCALE_VALUE], value=[])
-        ],
-            style={
-                'display': 'flex',
-                'justifyContent': 'flex-end',
-                'width': '100%',
-                'marginRight': '20px',
-                'marginTop': '-50px',
-                'marginBottom': '50px',
-                'position': 'relative',
-                'zIndex': '10'
-            }
-        ),
         dcc.RadioItems(
             id=CO2_DISPLAY_MODE_ID,
             options=[MODE_ABSOLUTE, MODE_PERCENT],
@@ -201,22 +180,14 @@ def register_callbacks(app):
     @app.callback(
         Output(CO2_HEATMAP_ID, 'figure'),
         [Input(CO2_SOURCES_ID, 'value'),
-         Input(CO2_FREEZE_SCALE_ID, 'value'),
          Input(CO2_DISPLAY_MODE_ID, 'value')]
     )
-    def update_co2_heatmap_output(source, freeze_scale_value, display_mode):
-        global dfs, global_freeze_source, last_zrange, last_scatter_yrange
-        freeze_checked = FREEZE_SCALE_VALUE in freeze_scale_value
+    def update_co2_heatmap_output(source, display_mode):
+        global dfs
         is_percent = display_mode == MODE_PERCENT
-        triggered_id = callback_context.triggered[0]['prop_id'].split('.')[0]
-
-        if triggered_id == CO2_FREEZE_SCALE_ID and freeze_checked:
-            global_freeze_source = source
-            raise PreventUpdate
 
         retrieve_data()
-        logging.info(f"Update CO2 heatmap: {source} [{display_mode}]"
-                     f"{(' (' + FREEZE_SCALE_VALUE + ')') if freeze_checked else ''}")
+        logging.info(f"Update CO2 heatmap: {source} [{display_mode}]")
 
         source_df = dfs[source]
 
@@ -254,32 +225,17 @@ def register_callbacks(app):
             scatter_yaxis_label = "tCO2"
             heatmap_hover = '<i>%{x} %{y}</i><br>%{z:,.2f} tCO2/h<extra></extra>'
 
-        current_data_yrange = _data_yrange(scatter_y)
-
-        if freeze_checked:
-            if last_scatter_yrange[display_mode] is None:
-                last_scatter_yrange[display_mode] = current_data_yrange
-            scatter_yrange = last_scatter_yrange[display_mode]
-        else:
-            last_scatter_yrange[display_mode] = current_data_yrange
-            scatter_yrange = current_data_yrange
+        scatter_yrange = _data_yrange(scatter_y)
 
         if is_percent:
-            current_zmin = dfs_heatmap.min().min()
-            current_zmax = dfs_heatmap.max().max()
+            zmin = dfs_heatmap.min().min()
+            zmax = dfs_heatmap.max().max()
         elif source == SOURCE_RATIO:
-            current_zmin = RATIO_ZMIN
-            current_zmax = RATIO_ZMAX
+            zmin = RATIO_ZMIN
+            zmax = RATIO_ZMAX
         else:
-            current_zmin = HEATMAP_ZMIN
-            current_zmax = HEATMAP_ZMAX
-        if freeze_checked:
-            if last_zrange[display_mode] is None:
-                last_zrange[display_mode] = [current_zmin, current_zmax]
-            zmin, zmax = last_zrange[display_mode]
-        else:
-            last_zrange[display_mode] = [current_zmin, current_zmax]
-            zmin, zmax = current_zmin, current_zmax
+            zmin = HEATMAP_ZMIN
+            zmax = HEATMAP_ZMAX
 
         heatmap_colorscale = GREEN_COLORSCALE if source == SOURCE_RENEWABLES else BROWN_BLACK_COLORSCALE
 
