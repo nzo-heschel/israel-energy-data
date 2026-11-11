@@ -36,6 +36,7 @@ HEATMAP_ZMIN = 0
 HEATMAP_ZMAX = 5000
 RATIO_ZMIN = 0
 RATIO_ZMAX = 0.5
+RENEWABLES_YMAX = 30000
 
 WANTED_SOURCES = [
     SOURCE_GAS,
@@ -128,11 +129,10 @@ def compute_percent_df(source_df, total_df):
 
 
 def _data_yrange(*scatter_series_list):
-    """Compute a tight [ymin, ymax] from one or more scatter series, with a small 5% padding."""
-    ymin = min(s.min() for s in scatter_series_list)
+    """Compute a [0, ymax] range from one or more scatter series, with a small 5% top padding."""
     ymax = max(s.max() for s in scatter_series_list)
-    pad = (ymax - ymin) * 0.05 if ymax != ymin else abs(ymax) * 0.05 or 1
-    return [ymin - pad, ymax + pad]
+    pad = ymax * 0.05 if ymax > 0 else 1
+    return [0, ymax + pad]
 
 
 def co2_layout(nav_links):
@@ -225,7 +225,10 @@ def register_callbacks(app):
             scatter_yaxis_label = "tCO2"
             heatmap_hover = '<i>%{x} %{y}</i><br>%{z:,.2f} tCO2/h<extra></extra>'
 
-        scatter_yrange = _data_yrange(scatter_y)
+        if source == SOURCE_RENEWABLES and not is_percent:
+            scatter_yrange = [0, RENEWABLES_YMAX]
+        else:
+            scatter_yrange = _data_yrange(scatter_y)
 
         if is_percent:
             zmin = dfs_heatmap.min().min()
@@ -241,13 +244,39 @@ def register_callbacks(app):
 
         fig = make_subplots(rows=2, cols=1, row_heights=[100, 600], vertical_spacing=0.05, shared_xaxes=True)
 
-        fig.add_trace(
-            go.Scatter(
-                x=dfs_heatmap.columns.values,
-                y=scatter_y,
-                hovertemplate=scatter_hover
-            ),
-            row=1, col=1)
+        if source == SOURCE_TOTAL:
+            cols = dfs_heatmap.columns
+            gas_y = dfs[SOURCE_GAS].reindex(columns=cols).sum() / 12
+            coal_y = dfs[SOURCE_COAL].reindex(columns=cols).sum() / 12
+            other_y = (dfs[SOURCE_DIESEL] + dfs[SOURCE_MAZUT]).reindex(columns=cols).sum() / 12
+            scatter_yaxis_label = "tCO2"
+            scatter_yrange = _data_yrange(gas_y + coal_y + other_y)
+
+            for area_name, area_y, area_color in [
+                (SOURCE_GAS, gas_y, "rgb(210, 180, 140)"),
+                (SOURCE_COAL, coal_y, "rgb(120, 72, 32)"),
+                (f"{SOURCE_DIESEL} + {SOURCE_MAZUT}", other_y, "rgb(30, 18, 8)"),
+            ]:
+                fig.add_trace(
+                    go.Scatter(
+                        x=cols.values,
+                        y=area_y,
+                        name=area_name,
+                        stackgroup="one",
+                        line=dict(width=0.5, color=area_color),
+                        fillcolor=area_color,
+                        hovertemplate=f"<i>%{{x}} : %{{y:,.2f}} tCO2</i><extra>{area_name}</extra>",
+                    ),
+                    row=1, col=1)
+        else:
+            fig.add_trace(
+                go.Scatter(
+                    x=dfs_heatmap.columns.values,
+                    y=scatter_y,
+                    line=dict(color="green") if source == SOURCE_RENEWABLES else None,
+                    hovertemplate=scatter_hover
+                ),
+                row=1, col=1)
 
         fig.add_trace(
             go.Heatmap(
