@@ -128,9 +128,20 @@ def compute_percent_df(source_df, total_df):
     return percent_df
 
 
+def _format_co2_val(val):
+    if abs(val) >= 1_000_000:
+        return f"{val / 1_000_000:,.2f} MtCO2"
+    if abs(val) >= 1_000:
+        return f"{val / 1_000:,.2f} ktCO2"
+    return f"{val:,.2f} tCO2"
+
+
 def _data_yrange(*scatter_series_list):
-    """Compute a [0, ymax] range from one or more scatter series, with a small 5% top padding."""
-    ymax = max(s.max() for s in scatter_series_list)
+    """Compute a [0, ymax] range from one or more scatter series, excluding the top 8 peaks, with 5% top padding."""
+    ymax = max(
+        (s.nlargest(9).iloc[-1] if len(s.dropna()) > 8 else s.max())
+        for s in scatter_series_list
+    )
     pad = ymax * 0.05 if ymax > 0 else 1
     return [0, ymax + pad]
 
@@ -204,6 +215,7 @@ def register_callbacks(app):
 
         if is_percent:
             scatter_y = dfs_heatmap.mean()
+            scatter_customdata = None
             scatter_hover = '<i>%{x} : %{y:,.1f}%</i><extra></extra>'
             scatter_yaxis_label = "%"
             heatmap_hover = '<i>%{x} %{y}</i><br>%{z:,.1f}%<extra></extra>'
@@ -216,12 +228,14 @@ def register_callbacks(app):
                 scatter_y = daily_co2.div(daily_gen).where(daily_gen > 0, 0).clip(lower=RATIO_ZMIN, upper=RATIO_ZMAX)
             else:
                 scatter_y = dfs_heatmap.mean()
+            scatter_customdata = None
             scatter_hover = '<i>%{x} : %{y:,.2f} tCO2/MWh</i><extra></extra>'
             scatter_yaxis_label = "tCO2/MWh"
             heatmap_hover = '<i>%{x} %{y}</i><br>%{z:,.2f} tCO2/MWh<extra></extra>'
         else:
             scatter_y = dfs_heatmap.sum() / 12
-            scatter_hover = '<i>%{x} : %{y:,.2f} tCO2</i><extra></extra>'
+            scatter_customdata = [_format_co2_val(v) for v in scatter_y]
+            scatter_hover = '<i>%{x} : %{customdata}</i><extra></extra>'
             scatter_yaxis_label = "tCO2"
             heatmap_hover = '<i>%{x} %{y}</i><br>%{z:,.2f} tCO2/h<extra></extra>'
 
@@ -249,23 +263,34 @@ def register_callbacks(app):
             gas_y = dfs[SOURCE_GAS].reindex(columns=cols).sum() / 12
             coal_y = dfs[SOURCE_COAL].reindex(columns=cols).sum() / 12
             other_y = (dfs[SOURCE_DIESEL] + dfs[SOURCE_MAZUT]).reindex(columns=cols).sum() / 12
+            total_y = gas_y + coal_y + other_y
             scatter_yaxis_label = "tCO2"
-            scatter_yrange = _data_yrange(gas_y + coal_y + other_y)
+            scatter_yrange = _data_yrange(total_y)
 
             for area_name, area_y, area_color in [
                 (SOURCE_GAS, gas_y, "rgb(210, 180, 140)"),
                 (SOURCE_COAL, coal_y, "rgb(120, 72, 32)"),
                 (f"{SOURCE_DIESEL} + {SOURCE_MAZUT}", other_y, "rgb(30, 18, 8)"),
             ]:
+                area_pct = area_y.div(total_y).where(total_y > 0, 0) * 100
+                customdata = [
+                    (_format_co2_val(val), f"{pct:.2f}", _format_co2_val(tot))
+                    for val, pct, tot in zip(area_y, area_pct, total_y)
+                ]
                 fig.add_trace(
                     go.Scatter(
                         x=cols.values,
                         y=area_y,
+                        customdata=customdata,
                         name=area_name,
                         stackgroup="one",
                         line=dict(width=0.5, color=area_color),
                         fillcolor=area_color,
-                        hovertemplate=f"<i>%{{x}} : %{{y:,.2f}} tCO2</i><extra>{area_name}</extra>",
+                        hovertemplate=(
+                            f"<i>%{{x}}<br>"
+                            f"{area_name}: %{{customdata[0]}} (%{{customdata[1]}}%)<br>"
+                            f"Total: %{{customdata[2]}}</i><extra></extra>"
+                        ),
                     ),
                     row=1, col=1)
         else:
@@ -273,6 +298,7 @@ def register_callbacks(app):
                 go.Scatter(
                     x=dfs_heatmap.columns.values,
                     y=scatter_y,
+                    customdata=scatter_customdata,
                     line=dict(color="green") if source == SOURCE_RENEWABLES else None,
                     hovertemplate=scatter_hover
                 ),
