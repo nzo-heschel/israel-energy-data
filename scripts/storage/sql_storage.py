@@ -73,7 +73,18 @@ class SqlStorageTemplate(Storage):
     def retrieve_range(self, namespace, from_date, to_date, tag=None, time="day"):
         return self._retrieve(namespace, date_from=fix_date(from_date), date_to=fix_date(to_date), tag=tag, time=time)
 
-    def retrieve_tag_dataframes(self, namespace, from_date, to_date):
+    def _sql_and_tag(self, tag):
+        if not tag:
+            return ""
+        tags = [t.strip() for t in tag.split(",") if t.strip()]
+        if not tags:
+            return ""
+        if len(tags) == 1:
+            return self.SQL_AND_TAG.format(tag=tags[0])
+        quoted = ", ".join(f"'{t}'" for t in tags)
+        return f" AND tag IN ({quoted})"
+
+    def retrieve_tag_dataframes(self, namespace, from_date, to_date, tag=None):
         fixed_from = fix_date(from_date)
         fixed_to = fix_date(to_date)
         start_dt = datetime.strptime(fixed_from, "%Y-%m-%d")
@@ -104,7 +115,8 @@ class SqlStorageTemplate(Storage):
         time_to_row[dt_time(12, 18)] = r_1215
 
         sql_and_date = self.SQL_AND_DATE_RANGE.format(from_date=fixed_from, to_date=fixed_to)
-        query = (self.SQL_RETRIEVE_COLUMNS + sql_and_date).format(namespace=namespace)
+        sql_and_tag = self._sql_and_tag(tag)
+        query = (self.SQL_RETRIEVE_COLUMNS + sql_and_date + sql_and_tag).format(namespace=namespace)
 
         t0 = time_module.perf_counter()
         seen_cols = [False] * max_days
@@ -195,7 +207,7 @@ class SqlStorageTemplate(Storage):
         return records[0][0]
 
     def _retrieve(self, namespace, date=None, date_from=None, date_to=None, tag=None, time="all"):
-        if date and tag and time not in ["all", "day", "hour"]:
+        if date and tag and "," not in tag and time not in ["all", "day", "hour"]:
             date = fix_date(date)
             value = self.retrieve_value(namespace, date, time, tag)
             return {namespace: {unfix_date(date): {time: {tag: value}}}}
@@ -203,21 +215,21 @@ class SqlStorageTemplate(Storage):
             sql_and_date = self.SQL_AND_DATE.format(date=date)
         else:
             sql_and_date = self.SQL_AND_DATE_RANGE.format(from_date=date_from, to_date=date_to)
-        sql_and_tag = self.SQL_AND_TAG if tag else ""
+        sql_and_tag = self._sql_and_tag(tag)
         if time == "month":
             query = (self.SQL_SUM_MONTH + sql_and_date + sql_and_tag + self.SQL_GROUP_BY_MONTH) \
-                .format(namespace=namespace, tag=tag)
+                .format(namespace=namespace)
         elif time == "day":
             query = (self.SQL_SUM_DAY + sql_and_date + sql_and_tag + self.SQL_GROUP_BY_DATE) \
-                .format(namespace=namespace, tag=tag)
+                .format(namespace=namespace)
         elif time == "hour":
             query = (self.SQL_SUM_HOUR + sql_and_date + sql_and_tag + self.SQL_GROUP_BY_HOUR) \
-                .format(namespace=namespace, tag=tag)
+                .format(namespace=namespace)
         else:
             query = (self.SQL_RETRIEVE + sql_and_date +
                      (self.SQL_AND_TIME if time != "all" else "") +
-                     (self.SQL_AND_TAG if tag else "")) \
-                .format(namespace=namespace, time=time, tag=tag)
+                     sql_and_tag) \
+                .format(namespace=namespace, time=time)
         t0 = time_module.perf_counter()
         d = {}
         date_cache = {}

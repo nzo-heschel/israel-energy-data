@@ -28,19 +28,20 @@ class InMemCache(Storage):
 
     def retrieve(self, namespace, date, time="all", tag=None):
         with self._lock:
-            if time not in ["all", "day", "hour"] and tag:  # single value
+            if time not in ["all", "day", "hour"] and tag and "," not in tag:  # single value
                 value = self.retrieve_value(namespace, fix_date(date), time, tag)
                 return {namespace: {date: {time: {tag: value}}}}
             values = self._in_mem_cache.get(namespace, {}).get(fix_date(date), {})
             if time not in ["all", "day", "hour"]:
                 values = {time: values.get(time)}
             day_result = {}
+            requested_tags = [t.strip() for t in tag.split(",") if t.strip()] if tag else None
             for time_key in values:
                 the_time_key = time_key if time == "all" \
                     else (time_key[0:3] + "00" if time == "hour"
                           else "00:00" if time == "day" else time)
                 values_by_tag = values.get(time_key)
-                tag_keys = values_by_tag.keys() if not tag else [tag]
+                tag_keys = values_by_tag.keys() if not requested_tags else requested_tags
                 if not day_result.get(the_time_key):
                     day_result[the_time_key] = {}
                 hour_result = day_result.get(the_time_key)

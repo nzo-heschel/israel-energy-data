@@ -176,7 +176,7 @@ def get_dataframes(store, source, noga_type, start_date, end_date, tag=None, tim
     logging.info("Retrieving %s data with type(s) %s from %s until %s with \"%s\" interval and tag \"%s\"",
                  source, ", ".join(noga_types), start_date, end_date, time, tag)
     key = f"{source}.{noga_type}"
-    dfs_out, latest_date, item_count = store.retrieve_tag_dataframes(key, start_date, end_date)
+    dfs_out, latest_date, item_count = store.retrieve_tag_dataframes(key, start_date, end_date, tag=tag)
     logging.info("Retrieved {} items of type {}".format(item_count, key))
     return dfs_out, latest_date
 

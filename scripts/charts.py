@@ -4,7 +4,7 @@ import threading
 import time
 from flask import request, Response
 from dash import Dash, dcc, html, Input, Output
-from pages import home, bar_chart, heatmap, storage
+from pages import home, bar_chart, heatmap, storage, co2
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ASSETS_PATH = os.path.join(ROOT_DIR, 'assets')
@@ -70,6 +70,7 @@ def check_startup_ready():
 PATH_BAR_CHART = '/bar-chart'
 PATH_HEATMAP = '/heatmap'
 PATH_STORAGE = '/storage'
+PATH_CO2 = '/co2'
 
 nav_links = html.Div([
     dcc.Link('דף הבית', href='/'),
@@ -79,6 +80,8 @@ nav_links = html.Div([
     dcc.Link('תמהיל הייצור', href=PATH_HEATMAP),
     html.Span(' | '),
     dcc.Link('אגירה', href=PATH_STORAGE),
+    html.Span(' | '),
+    dcc.Link('פליטות', href=PATH_CO2),
     html.Hr()
 ], style={'padding': '10px', 'textAlign': 'right'})
 
@@ -120,6 +123,8 @@ def display_page(pathname):
         return heatmap.heatmap_layout(nav_links)
     elif pathname == PATH_STORAGE:
         return storage.storage_layout(nav_links)
+    elif pathname == PATH_CO2:
+        return co2.co2_layout(nav_links)
     else:
         # Default to home page for '/' or any unrecognized path
         return home.home_layout(nav_links, LOGO_URL)
@@ -128,6 +133,7 @@ def display_page(pathname):
 bar_chart.register_callbacks(dash_app)
 heatmap.register_callbacks(dash_app)
 storage.register_callbacks(dash_app)
+co2.register_callbacks(dash_app)
 
 if __name__ == "__main__":
     main()
