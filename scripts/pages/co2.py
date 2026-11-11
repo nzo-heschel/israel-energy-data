@@ -335,7 +335,7 @@ def register_callbacks(app):
                 x=0.5,
                 xanchor='center',
                 font={"family": "Hebrew", "size": 36},
-                text='פליטות CO2'
+                text='CO2 פליטות'
             ),
         )
         return fig
