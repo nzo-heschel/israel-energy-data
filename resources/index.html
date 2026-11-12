@@ -1,21 +1,204 @@
-<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">
-<html>
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
 <head>
-    <title>NZO Data collector</title>
-    <style type="text/css">
-          html {background-color: #eee; font-family: sans;}
-          body {background-color: #fff; border: 1px solid #ddd;
-                padding: 15px; margin: 15px;}
-          h1 {background-color: beige;}
-          h2 {background-color: lightgrey;}
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>NZO Data API | ממשק נתוני האנרגיה של ישראל</title>
+    <link rel="stylesheet" href="/assets/style.css">
+    <style>
+        .api-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 18px;
+            margin-top: 18px;
+        }
+        .api-endpoint-card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 16px;
+            padding: 22px;
+            box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+            text-decoration: none;
+            color: inherit;
+        }
+        .api-endpoint-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+            border-color: #0284c7;
+        }
+        .api-badge-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            direction: ltr;
+        }
+        .method-badge {
+            background: #e0f2fe;
+            color: #0369a1;
+            font-family: 'Inter', monospace;
+            font-size: 12px;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 9999px;
+        }
+        .format-badge {
+            background: #d1fae5;
+            color: #065f46;
+            font-family: 'Inter', sans-serif;
+            font-size: 12px;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 9999px;
+        }
+        .code-url {
+            font-family: 'Inter', monospace;
+            font-size: 12.5px;
+            color: #334155;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 8px 10px;
+            margin-top: 12px;
+            direction: ltr;
+            text-align: left;
+            overflow-x: auto;
+            white-space: nowrap;
+        }
+        .params-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 12px;
+            font-size: 14px;
+        }
+        .params-table th, .params-table td {
+            padding: 12px 14px;
+            border-bottom: 1px solid #e2e8f0;
+            text-align: right;
+        }
+        .params-table th {
+            background: #f8fafc;
+            font-weight: 700;
+            color: #334155;
+        }
+        .params-table code {
+            font-family: 'Inter', monospace;
+            background: #f1f5f9;
+            padding: 2px 6px;
+            border-radius: 6px;
+            font-size: 13px;
+            color: #0369a1;
+            direction: ltr;
+            display: inline-block;
+        }
     </style>
 </head>
 <body>
-<h1 dir="rtl" lang="he" align="center">ברוכים הבאים לאתר הנתונים של NZO</h1>
-<h2>Noga sample URLs</h2>
-<p>Last month <a href="/get?source=noga2&type=smp&time=hour">SMP</a> hourly data in default (json) format</p>
-<p>2024 <a href="/get?source=noga2&type=cost&start_date=01-01-2024&end_date=31-12-2024&time=day&format=csv">Cost</a> daily data in csv format (use <b>format=tsv</b> for tabs instead of commas)</p>
-<p>December 2022 <a href="/get?source=noga2&type=forecast1&start_date=01-12-2022&end_date=31-12-2022&time=all&tag=SystemDemand&format=html">Forecast-1</a> (day in advance) full (1/2 hr) system demand data as html table</p>
-<p>Can also use type=forcast2 (update), time=month for monthly data</p>
+    <header class="nzo-navbar">
+        <a href="/" class="nzo-brand">
+            <img src="/assets/logo.png" class="nzo-brand-logo" alt="NZO Logo">
+            <div class="nzo-brand-text">
+                <span class="nzo-brand-title">NZO Energy Data API</span>
+                <span class="nzo-brand-subtitle">ממשק שאילתות וניהול נתוני נגה</span>
+            </div>
+        </a>
+        <div class="nzo-nav-badge">
+            <span class="nzo-status-dot"></span>
+            <span>API Server Active</span>
+        </div>
+    </header>
+
+    <main class="nzo-page-container">
+        <section class="nzo-hero">
+            <div class="nzo-hero-content">
+                <div class="nzo-hero-eyebrow">⚡ REST Data Service</div>
+                <h1 class="nzo-hero-title">ברוכים הבאים לשרת הנתונים של NZO</h1>
+                <p class="nzo-hero-desc">
+                    ממשק ה-API מאפשר שליפה מהירה של נתוני משק החשמל מנגה (מחיר שולי SMP, תמהיל ייצור, ביקוש ופליטות CO₂) במגוון פורמטים: JSON, CSV, TSV, HTML ו-MsgPack.
+                </p>
+            </div>
+            <div class="nzo-hero-logo-box">
+                <img src="/assets/logo.png" class="nzo-hero-logo" alt="NZO Logo">
+            </div>
+        </section>
+
+        <h2 class="nzo-page-title" style="font-size: 22px; margin-bottom: 8px;">דוגמאות לשאילתות נפוצות (Sample Queries)</h2>
+        <div class="api-grid">
+            <a class="api-endpoint-card" href="/get?source=noga2&type=smp&time=hour">
+                <div>
+                    <div class="api-badge-row">
+                        <span class="method-badge">GET /get</span>
+                        <span class="format-badge">JSON (Default)</span>
+                    </div>
+                    <h3 class="nzo-feature-title" style="font-size: 18px;">נתוני מחיר שולי (SMP) שעתיים</h3>
+                    <p class="nzo-feature-desc" style="margin-bottom: 8px;">שליפת נתוני החודש האחרון של המחיר השולי במערכת (SMP) באגרגציה שעתית בפורמט JSON.</p>
+                </div>
+                <div class="code-url">/get?source=noga2&amp;type=smp&amp;time=hour</div>
+            </a>
+
+            <a class="api-endpoint-card" href="/get?source=noga2&type=cost&start_date=01-01-2024&end_date=31-12-2024&time=day&format=csv">
+                <div>
+                    <div class="api-badge-row">
+                        <span class="method-badge">GET /get</span>
+                        <span class="format-badge">CSV / TSV</span>
+                    </div>
+                    <h3 class="nzo-feature-title" style="font-size: 18px;">נתוני עלות יומיים לשנת 2024</h3>
+                    <p class="nzo-feature-desc" style="margin-bottom: 8px;">ייצוא נתוני שנת 2024 באגרגציה יומית לקובץ CSV (ניתן להשתמש ב-<code>format=tsv</code> להפרדת טאבים).</p>
+                </div>
+                <div class="code-url">/get?source=noga2&amp;type=cost&amp;start_date=01-01-2024&amp;end_date=31-12-2024&amp;time=day&amp;format=csv</div>
+            </a>
+
+            <a class="api-endpoint-card" href="/get?source=noga2&type=forecast1&start_date=01-12-2022&end_date=31-12-2022&time=all&tag=SystemDemand&format=html">
+                <div>
+                    <div class="api-badge-row">
+                        <span class="method-badge">GET /get</span>
+                        <span class="format-badge">HTML Table</span>
+                    </div>
+                    <h3 class="nzo-feature-title" style="font-size: 18px;">תחזית ביקוש מערכתית (Forecast-1)</h3>
+                    <p class="nzo-feature-desc" style="margin-bottom: 8px;">נתוני דצמבר 2022 ברזולוציה מלאה (חצי-שעתית) של תחזית הביקוש יום מראש כטבלת HTML.</p>
+                </div>
+                <div class="code-url">/get?source=noga2&amp;type=forecast1&amp;start_date=01-12-2022&amp;end_date=31-12-2022&amp;time=all&amp;tag=SystemDemand&amp;format=html</div>
+            </a>
+        </div>
+
+        <div class="nzo-card" style="margin-top: 28px; direction: rtl;">
+            <h3 style="margin: 0 0 10px 0; font-size: 18px;">פרמטרים נתמכים בנקודת הקצה <code>/get</code></h3>
+            <table class="params-table">
+                <thead>
+                    <tr>
+                        <th>פרמטר</th>
+                        <th>ערכים אפשריים</th>
+                        <th>תיאור</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>source</code></td>
+                        <td><code>noga2</code>, <code>noga</code>, <code>all</code></td>
+                        <td>מקור הנתונים במערכת</td>
+                    </tr>
+                    <tr>
+                        <td><code>type</code></td>
+                        <td><code>smp</code>, <code>energy</code>, <code>co2emission</code>, <code>system_demand</code>, <code>cost</code>, <code>forecast1</code>, <code>forecast2</code></td>
+                        <td>סוג סדרת הנתונים המבוקשת</td>
+                    </tr>
+                    <tr>
+                        <td><code>time</code></td>
+                        <td><code>all</code>, <code>hour</code>, <code>day</code>, <code>month</code></td>
+                        <td>רמת האגרגציה על ציר הזמן</td>
+                    </tr>
+                    <tr>
+                        <td><code>format</code></td>
+                        <td><code>json</code>, <code>csv</code>, <code>tsv</code>, <code>html</code>, <code>bin</code></td>
+                        <td>פורמט הפלט המוחזר</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </main>
 </body>
 </html>

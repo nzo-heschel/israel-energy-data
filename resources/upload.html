@@ -1,19 +1,103 @@
 <!DOCTYPE html>
-<html>
+<html lang="he" dir="rtl">
 <head>
-    <title>upload the file : GFG</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>העלאת קובץ נתונים | NZO Energy Data</title>
+    <link rel="stylesheet" href="/assets/style.css">
+    <style>
+        .upload-wrapper {
+            max-width: 540px;
+            margin: 48px auto;
+        }
+        .form-field {
+            margin-bottom: 20px;
+        }
+        .form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 700;
+            color: #334155;
+            margin-bottom: 8px;
+        }
+        .form-select, .form-file {
+            width: 100%;
+            padding: 12px 14px;
+            border: 1px solid #cbd5e1;
+            border-radius: 12px;
+            font-family: inherit;
+            font-size: 15px;
+            background: #f8fafc;
+            color: #0f172a;
+        }
+        .form-file {
+            border: 2px dashed #94a3b8;
+            padding: 28px 16px;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.2s ease, background 0.2s ease;
+        }
+        .form-file:hover {
+            border-color: #0284c7;
+            background: #f0f9ff;
+        }
+        .submit-btn {
+            width: 100%;
+            padding: 13px 20px;
+            border: none;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #0284c7, #0369a1);
+            color: #ffffff;
+            font-family: inherit;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 4px 14px rgba(2, 132, 199, 0.3);
+            transition: transform 0.16s ease, opacity 0.16s ease;
+        }
+        .submit-btn:hover {
+            transform: translateY(-1px);
+        }
+        .submit-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+    </style>
 </head>
 <body>
-<form id = "upload-file" action = "/success" method = "post" enctype="multipart/form-data">
-    <label for="source">Source:</label>
-    <select id="source" name="source">
-        <option value="noga">noga</option>
-    </select>
-    <br>
-    <input type="file" name="file" required />
-    <input type="submit" value="Upload" onclick="this.form.submit();this.disabled = true;">
-</form>
+    <header class="nzo-navbar">
+        <a href="/" class="nzo-brand">
+            <img src="/assets/logo.png" class="nzo-brand-logo" alt="NZO Logo">
+            <div class="nzo-brand-text">
+                <span class="nzo-brand-title">NZO Energy Data API</span>
+                <span class="nzo-brand-subtitle">ממשק שאילתות וניהול נתוני נגה</span>
+            </div>
+        </a>
+    </header>
 
+    <main class="nzo-page-container">
+        <div class="upload-wrapper">
+            <div class="nzo-card" style="padding: 32px;">
+                <h1 class="nzo-page-title" style="font-size: 24px; margin-bottom: 6px;">העלאת קובץ נתונים למסד</h1>
+                <p class="nzo-page-subtitle" style="margin-bottom: 24px;">בחרו את מקור הנתונים והעלו קובץ אקסל (XLSX) שהורד ממערכת נגה.</p>
 
+                <form id="upload-file" action="/success" method="post" enctype="multipart/form-data">
+                    <div class="form-field">
+                        <label class="form-label" for="source">מקור הנתונים (Source):</label>
+                        <select class="form-select" id="source" name="source">
+                            <option value="noga">נגה - ניהול מערכת החשמל (noga)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-field">
+                        <label class="form-label" for="file-input">קובץ נתונים (Excel):</label>
+                        <input class="form-file" id="file-input" type="file" name="file" required />
+                    </div>
+
+                    <input class="submit-btn" type="submit" value="העלה ושמור במסד הנתונים" onclick="if(this.form.checkValidity()){this.form.submit();this.disabled=true;this.value='מעלה ומעבד נתונים...';}">
+                </form>
+            </div>
+        </div>
+    </main>
 </body>
 </html>

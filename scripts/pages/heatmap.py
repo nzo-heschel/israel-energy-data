@@ -19,8 +19,28 @@ MODE_ABSOLUTE = "Absolute"
 MODE_PERCENT = "Percent"
 
 STORAGE_NET_SOURCES = {"PspNet", "BatteriesNet"}
-COLOR_DISCHARGE = "green"
-COLOR_CHARGE = "red"
+COLOR_DISCHARGE = "#10b981"
+COLOR_CHARGE = "#f43f5e"
+
+SOURCE_LABELS = {
+    "Pv": "☀️ סולארי",
+    "Gas": "🔥 גז טבעי",
+    "Coal": "🪨 פחם",
+    "Wind": "🌬️ רוח",
+    "Thermo": "🔆 תרמו-סולארי",
+    "BioGas": "🌱 ביוגז",
+    "Solar": "⛽ דיזל",
+    "Diesel": "⛽ דיזל",
+    "Mazut": "🛢️ מזוט",
+    "Other": "⚙️ אחר",
+    "ActualDemand": "⚡ ביקוש משקי",
+    "RenewableSum": "♻️ סה״כ מתחדשות",
+    "PvWithStorage": "☀️🔋 סולארי משולב אגירה",
+    "BatteriesNet": "🔋 סוללות (נטו)",
+    "Psp": "💧 אגירה שאובה",
+    "PspNet": "💧 אגירה שאובה (נטו)",
+    "Storage": "🔋 סה״כ אגירה",
+}
 
 select_source = "Pv"
 start_date = "01-01-2024"
@@ -54,6 +74,10 @@ global_freeze_source = None  # The source for which the scale is frozen
 # None means 'not yet drawn in this mode' — first draw seeds the value even if frozen.
 last_zrange = {MODE_ABSOLUTE: None, MODE_PERCENT: None}
 last_scatter_yrange = {MODE_ABSOLUTE: None, MODE_PERCENT: None}
+
+
+def _format_source_options(src_list):
+    return [{"label": SOURCE_LABELS.get(s, s), "value": s} for s in src_list]
 
 
 def retrieve_data():
@@ -112,37 +136,63 @@ def _data_yrange(*scatter_series_list):
 def heatmap_layout(nav_links):
     return html.Div([
         nav_links,
-        dcc.Graph(
-            id=HEATMAP_ID,
-            style={'marginBottom': '0px'}
-        ),
-        html.Div([
-            dcc.Checklist(id=FREEZE_SCALE_ID, options=[FREEZE_SCALE_VALUE], value=[])
-        ],
-            style={
-                'display': 'flex',
-                'justifyContent': 'flex-end',
-                'width': '100%',
-                'marginRight': '20px',
-                'marginTop': '-50px',
-                'marginBottom': '50px',
-                'position': 'relative',
-                'zIndex': '10'
-            }
-        ),
-        dcc.RadioItems(
-            id=DISPLAY_MODE_ID,
-            options=[MODE_ABSOLUTE, MODE_PERCENT],
-            value=MODE_ABSOLUTE,
-            inline=True,
-            style={'textAlign': 'center', 'fontSize': 18, 'marginBottom': '6px'}
-        ),
-        dcc.RadioItems(
-            id=SOURCES_ID,
-            options=sources,
-            value=select_source,
-            inline=True,
-            style={'textAlign': 'center', 'fontSize': 20, 'marginTop': '0px'}),
+        html.Main([
+            html.Div([
+                html.Div([
+                    html.H1("תמהיל הייצור במשק החשמל", className='nzo-page-title'),
+                    html.P("מפה שעתית ברזולוציה של 5 דקות ומגמה יומית לכל מקורות האנרגיה", className='nzo-page-subtitle'),
+                ]),
+                html.Span("מקור הנתונים: נגה", className='nzo-source-pill'),
+            ], className='nzo-page-header'),
+
+            # Controls Toolbar Card
+            html.Div([
+                html.Div([
+                    html.Div([
+                        html.Span("תצוגת נתונים:", className='nzo-control-label'),
+                        dcc.RadioItems(
+                            id=DISPLAY_MODE_ID,
+                            options=[
+                                {'label': 'ערכים מוחלטים (MW / MWh)', 'value': MODE_ABSOLUTE},
+                                {'label': 'אחוז מהביקוש (%)', 'value': MODE_PERCENT},
+                            ],
+                            value=MODE_ABSOLUTE,
+                            inline=True,
+                            className='nzo-segmented-radio'
+                        ),
+                    ], className='nzo-control-group'),
+
+                    html.Div([
+                        dcc.Checklist(
+                            id=FREEZE_SCALE_ID,
+                            options=[{'label': 'הקפאת סקאלה', 'value': FREEZE_SCALE_VALUE}],
+                            value=[],
+                            className='nzo-checklist-pill'
+                        ),
+                    ], className='nzo-control-group'),
+                ], style={'display': 'flex', 'justifyContent': 'space-between', 'alignItems': 'center', 'width': '100%', 'flexWrap': 'wrap', 'gap': '12px', 'paddingBottom': '12px', 'borderBottom': '1px solid #e2e8f0'}),
+
+                html.Div([
+                    html.Span("מקור אנרגיה:", className='nzo-control-label'),
+                    dcc.RadioItems(
+                        id=SOURCES_ID,
+                        options=_format_source_options(sources),
+                        value=select_source,
+                        inline=True,
+                        className='nzo-pill-selector'
+                    ),
+                ], className='nzo-control-group', style={'width': '100%', 'paddingTop': '4px'}),
+            ], className='nzo-toolbar-card'),
+
+            # Chart Card
+            html.Div([
+                dcc.Graph(
+                    id=HEATMAP_ID,
+                    style={'marginBottom': '0px'},
+                    config={'responsive': True}
+                ),
+            ], className='nzo-card-chart'),
+        ], className='nzo-page-container'),
     ])
 
 
@@ -155,12 +205,12 @@ def register_callbacks(app):
     )
     def update_source_options(display_mode, current_source):
         if display_mode == MODE_PERCENT:
-            options = [s for s in sources if s != "ActualDemand"]
+            filtered = [s for s in sources if s != "ActualDemand"]
             value = select_source if current_source == "ActualDemand" else current_source
         else:
-            options = sources
+            filtered = sources
             value = current_source
-        return options, value
+        return _format_source_options(filtered), value
 
     @app.callback(
         Output(HEATMAP_ID, 'figure'),
@@ -174,9 +224,6 @@ def register_callbacks(app):
         is_percent = display_mode == MODE_PERCENT
         triggered_id = callback_context.triggered[0]['prop_id'].split('.')[0]
 
-        # Checking freeze: nothing to redraw, just record which source was active.
-        # The Y range to freeze is whatever was last drawn for this mode, already stored
-        # in last_scatter_yrange[display_mode].
         if triggered_id == FREEZE_SCALE_ID and freeze_checked:
             global_freeze_source = source
             raise PreventUpdate
@@ -203,29 +250,19 @@ def register_callbacks(app):
             scatter_y = dfs_heatmap.mean()
             scatter_pos_y = dfs_heatmap[dfs_heatmap > 0].sum() / valid_counts
             scatter_neg_y = -dfs_heatmap[dfs_heatmap < 0].sum() / valid_counts
-            scatter_hover = '<i>%{x} : %{y:,.1f}%</i><extra></extra>'
-            scatter_yaxis_label = "%"
-            heatmap_hover = '<i>%{x} %{y}</i><br>%{z:,.1f}%<extra></extra>'
+            scatter_hover = '<b>%{x}</b>: %{y:,.1f}%<extra></extra>'
+            scatter_yaxis_label = "ממוצע יומי (%)"
+            heatmap_hover = '<b>%{x} | %{y}</b><br>%{z:,.1f}%<extra></extra>'
         else:
             scatter_y = dfs_heatmap.sum() / 12
             scatter_pos_y = dfs_heatmap[dfs_heatmap > 0].sum() / 12
             scatter_neg_y = -dfs_heatmap[dfs_heatmap < 0].sum() / 12
-            scatter_hover = '<i>%{x} : %{y:,.2f} MWh</i><extra></extra>'
-            scatter_yaxis_label = "MWh"
-            heatmap_hover = '<i>%{x} %{y}</i><br>%{z:,.2f} MW<extra></extra>'
+            scatter_hover = '<b>%{x}</b>: %{y:,.2f} MWh<extra></extra>'
+            scatter_yaxis_label = "אנרגיה יומית (MWh)"
+            heatmap_hover = '<b>%{x} | %{y}</b><br>%{z:,.2f} MW<extra></extra>'
 
         show_pos_neg = source in STORAGE_NET_SOURCES
 
-        # Decide the scatter Y range to apply.
-        #
-        # freeze_checked=True:
-        #   Use last_scatter_yrange[mode]. If it is None (e.g. page was just loaded and
-        #   freeze was checked before any source switch), compute it from the current data
-        #   and store it so subsequent source switches keep the same range.
-        #
-        # freeze_checked=False:
-        #   Always compute from current data and update last_scatter_yrange[mode]
-        #   so that if the user later checks freeze, we have the latest range ready.
         if show_pos_neg:
             current_data_yrange = _data_yrange(scatter_pos_y, scatter_neg_y)
         else:
@@ -233,14 +270,12 @@ def register_callbacks(app):
 
         if freeze_checked:
             if last_scatter_yrange[display_mode] is None:
-                # First draw in this mode while frozen — seed the stored range
                 last_scatter_yrange[display_mode] = current_data_yrange
             scatter_yrange = last_scatter_yrange[display_mode]
         else:
             last_scatter_yrange[display_mode] = current_data_yrange
             scatter_yrange = current_data_yrange
 
-        # Heatmap Z range — same pattern as scatter Y range.
         current_zmin = dfs_heatmap.min().min()
         current_zmax = dfs_heatmap.max().max()
         if freeze_checked:
@@ -251,15 +286,15 @@ def register_callbacks(app):
             last_zrange[display_mode] = [current_zmin, current_zmax]
             zmin, zmax = current_zmin, current_zmax
 
-        fig = make_subplots(rows=2, cols=1, row_heights=[100, 600], vertical_spacing=0.05, shared_xaxes=True)
+        fig = make_subplots(rows=2, cols=1, row_heights=[140, 580], vertical_spacing=0.04, shared_xaxes=True)
 
         if show_pos_neg:
             fig.add_trace(
                 go.Scatter(
                     x=dfs_heatmap.columns.values,
                     y=scatter_pos_y,
-                    name='Discharge',
-                    line=dict(color=COLOR_DISCHARGE),
+                    name='פריקה',
+                    line=dict(color=COLOR_DISCHARGE, width=2),
                     hovertemplate=scatter_hover
                 ),
                 row=1, col=1)
@@ -267,8 +302,8 @@ def register_callbacks(app):
                 go.Scatter(
                     x=dfs_heatmap.columns.values,
                     y=scatter_neg_y,
-                    name='Charge',
-                    line=dict(color=COLOR_CHARGE),
+                    name='טעינה',
+                    line=dict(color=COLOR_CHARGE, width=2),
                     hovertemplate=scatter_hover
                 ),
                 row=1, col=1)
@@ -277,6 +312,9 @@ def register_callbacks(app):
                 go.Scatter(
                     x=dfs_heatmap.columns.values,
                     y=scatter_y,
+                    line=dict(color="#0284c7", width=2),
+                    fill='tozeroy',
+                    fillcolor='rgba(2, 132, 199, 0.10)',
                     hovertemplate=scatter_hover
                 ),
                 row=1, col=1)
@@ -290,32 +328,55 @@ def register_callbacks(app):
                 zmin=zmin,
                 zmax=zmax,
                 colorbar={
-                    'len': 0.8,
-                    'y': 0.4,
-                    'ticksuffix': '%' if is_percent else ''
+                    'len': 0.78,
+                    'y': 0.39,
+                    'thickness': 16,
+                    'outlinewidth': 0,
+                    'ticksuffix': '%' if is_percent else ' MW'
                 },
                 hovertemplate=heatmap_hover
             ),
             row=2, col=1)
 
-        fig.update_xaxes(showticklabels=False, row=1, col=1)
-        # Always set an explicit range on the scatter Y axis — this is the only reliable
-        # way to control it. Plotly ignores uirevision for axis range when new trace data
-        # is provided, so we must own the range completely rather than delegating to Plotly.
-        fig.update_yaxes(title_text=scatter_yaxis_label, range=scatter_yrange, col=1, row=1)
+        fig.update_xaxes(showticklabels=False, gridcolor="#e2e8f0", row=1, col=1)
+        fig.update_xaxes(gridcolor="#e2e8f0", tickfont={"size": 13, "color": "#475569"}, row=2, col=1)
         fig.update_yaxes(
+            title_text=scatter_yaxis_label,
+            title_font={"size": 13, "color": "#475569"},
+            tickfont={"size": 12, "color": "#475569"},
+            gridcolor="#e2e8f0",
+            range=scatter_yrange,
+            col=1, row=1
+        )
+        fig.update_yaxes(
+            title_text="שעה ביממה",
+            title_font={"size": 13, "color": "#475569"},
             tickvals=[0, n_y - 1, n_y * 2 - 1, n_y * 3 - 1, n_y * 4 - 1],
             ticktext=['00:00', '06:00', '12:00', '18:00', '24:00'],
-            row=2, col=1)
+            tickfont={"size": 13, "color": "#475569"},
+            row=2, col=1
+        )
+
+        source_display = SOURCE_LABELS.get(source, source)
         fig.update_layout(
-            height=800,
+            height=760,
+            font={"family": "Heebo, Inter, sans-serif", "color": "#0f172a"},
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='#ffffff',
+            margin=dict(l=70, r=40, t=55, b=45),
             showlegend=show_pos_neg,
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
             uirevision=True,
+            hoverlabel=dict(
+                bgcolor="#0f172a",
+                font_size=13,
+                font_family="Heebo, Inter, sans-serif",
+            ),
             title=go.layout.Title(
                 x=0.5,
                 xanchor='center',
-                font={"family": "Hebrew", "size": 36},
-                text='תמהיל הייצור'
+                font={"family": "Heebo, Inter, sans-serif", "size": 22, "color": "#0f172a"},
+                text=f"תמהיל הייצור • {source_display}"
             ),
         )
         return fig

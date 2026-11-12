@@ -1,0 +1,682 @@
+@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+    --bg-primary: #f1f5f9;
+    --bg-gradient: radial-gradient(circle at 10% 0%, #e0f2fe 0%, #f1f5f9 45%, #f8fafc 100%);
+    --surface: #ffffff;
+    --surface-hover: #f8fafc;
+    --surface-muted: #f1f5f9;
+    --border-color: #e2e8f0;
+    --border-strong: #cbd5e1;
+    
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --text-muted: #64748b;
+    
+    --brand-blue: #0284c7;
+    --brand-blue-dark: #0369a1;
+    --brand-blue-light: #e0f2fe;
+    --brand-teal: #0d9488;
+    --brand-green: #10b981;
+    --brand-green-light: #d1fae5;
+    --brand-amber: #f59e0b;
+    --brand-amber-light: #fef3c7;
+    --brand-rose: #f43f5e;
+    --brand-rose-light: #ffe4e6;
+    
+    --shadow-sm: 0 1px 3px 0 rgba(15, 23, 42, 0.06), 0 1px 2px -1px rgba(15, 23, 42, 0.04);
+    --shadow-md: 0 4px 20px -2px rgba(15, 23, 42, 0.06), 0 2px 6px -1px rgba(15, 23, 42, 0.04);
+    --shadow-lg: 0 12px 32px -4px rgba(15, 23, 42, 0.08), 0 4px 12px -2px rgba(15, 23, 42, 0.04);
+    
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --radius-xl: 22px;
+    --radius-pill: 9999px;
+}
+
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
+html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg-primary);
+    background-image: var(--bg-gradient);
+    background-attachment: fixed;
+    color: var(--text-primary);
+    font-family: 'Heebo', 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+}
+
+/* ==========================================================================
+   Top Sticky Navigation Bar
+   ========================================================================== */
+.nzo-navbar {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    background: rgba(255, 255, 255, 0.88);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border-color);
+    box-shadow: var(--shadow-sm);
+    padding: 0 28px;
+    height: 70px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    direction: rtl;
+}
+
+.nzo-brand {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    text-decoration: none;
+    color: var(--text-primary);
+}
+
+.nzo-brand-logo {
+    height: 36px;
+    width: auto;
+    display: block;
+    transition: transform 0.2s ease;
+}
+
+.nzo-brand:hover .nzo-brand-logo {
+    transform: scale(1.04);
+}
+
+.nzo-brand-text {
+    display: flex;
+    flex-direction: column;
+}
+
+.nzo-brand-title {
+    font-size: 18px;
+    font-weight: 800;
+    line-height: 1.15;
+    color: var(--text-primary);
+    letter-spacing: -0.01em;
+}
+
+.nzo-brand-subtitle {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-muted);
+}
+
+.nzo-nav-links {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.nzo-nav-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: var(--radius-pill);
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-decoration: none;
+    transition: all 0.18s ease;
+    border: 1px solid transparent;
+}
+
+.nzo-nav-link:hover {
+    color: var(--brand-blue-dark);
+    background: var(--surface-muted);
+}
+
+.nzo-nav-link.active {
+    color: var(--brand-blue-dark);
+    background: var(--brand-blue-light);
+    border-color: rgba(2, 132, 199, 0.22);
+    box-shadow: 0 1px 2px rgba(2, 132, 199, 0.08);
+}
+
+.nzo-nav-badge {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--brand-teal);
+    background: var(--brand-green-light);
+    padding: 4px 12px;
+    border-radius: var(--radius-pill);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.nzo-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--brand-green);
+    display: inline-block;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+}
+
+/* ==========================================================================
+   Page Container & Layout
+   ========================================================================== */
+.nzo-page-container {
+    max-width: 1480px;
+    margin: 0 auto;
+    padding: 24px 28px 56px;
+}
+
+.nzo-page-header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 20px;
+    direction: rtl;
+}
+
+.nzo-page-title {
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--text-primary);
+    margin: 0 0 4px 0;
+    letter-spacing: -0.02em;
+}
+
+.nzo-page-subtitle {
+    font-size: 15px;
+    color: var(--text-secondary);
+    margin: 0;
+    font-weight: 400;
+}
+
+.nzo-source-pill {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    background: var(--surface);
+    border: 1px solid var(--border-color);
+    padding: 6px 14px;
+    border-radius: var(--radius-pill);
+    box-shadow: var(--shadow-sm);
+}
+
+/* ==========================================================================
+   Cards & Panels
+   ========================================================================== */
+.nzo-card {
+    background: var(--surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+    padding: 20px 24px;
+    margin-bottom: 20px;
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.nzo-card-chart {
+    background: var(--surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+    padding: 16px 20px;
+    margin-bottom: 20px;
+    overflow: hidden;
+}
+
+.nzo-toolbar-card {
+    background: var(--surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    padding: 16px 24px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 20px;
+    direction: rtl;
+}
+
+.nzo-control-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.nzo-control-label {
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--text-muted);
+    margin-left: 4px;
+    white-space: nowrap;
+}
+
+.nzo-divider-vertical {
+    width: 1px;
+    height: 32px;
+    background: var(--border-color);
+}
+
+/* ==========================================================================
+   Modern Segmented Controls / Pill RadioItems & Checklists
+   ========================================================================== */
+.nzo-segmented-radio,
+.nzo-pill-selector,
+.nzo-checklist-pill {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+}
+
+.nzo-segmented-radio {
+    background: var(--surface-muted);
+    padding: 4px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-color);
+}
+
+.nzo-segmented-radio label,
+.nzo-pill-selector label,
+.nzo-checklist-pill label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 15px;
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.16s ease;
+    user-select: none;
+    margin: 0 !important;
+}
+
+.nzo-pill-selector label {
+    background: var(--surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-pill);
+    padding: 7px 16px;
+    box-shadow: var(--shadow-sm);
+}
+
+.nzo-checklist-pill label {
+    background: var(--surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-pill);
+    padding: 7px 16px;
+    box-shadow: var(--shadow-sm);
+}
+
+.nzo-segmented-radio label:hover,
+.nzo-pill-selector label:hover,
+.nzo-checklist-pill label:hover {
+    color: var(--text-primary);
+    border-color: var(--border-strong);
+}
+
+/* Hide native radio/checkbox inputs inside styled pill groups */
+.nzo-segmented-radio input[type="radio"],
+.nzo-pill-selector input[type="radio"],
+.nzo-checklist-pill input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 0;
+    height: 0;
+    margin: 0;
+    opacity: 0;
+    position: absolute;
+}
+
+/* Active / Checked States */
+.nzo-segmented-radio label:has(input:checked) {
+    background: var(--surface);
+    color: var(--brand-blue-dark);
+    box-shadow: var(--shadow-sm);
+}
+
+.nzo-pill-selector label:has(input:checked) {
+    background: linear-gradient(135deg, var(--brand-blue), var(--brand-blue-dark));
+    color: #ffffff;
+    border-color: var(--brand-blue-dark);
+    box-shadow: 0 3px 10px rgba(2, 132, 199, 0.25);
+}
+
+.nzo-checklist-pill label:has(input:checked) {
+    background: var(--brand-blue-light);
+    color: var(--brand-blue-dark);
+    border-color: var(--brand-blue);
+    box-shadow: 0 2px 6px rgba(2, 132, 199, 0.14);
+}
+
+.nzo-checklist-pill label:has(input:checked)::before {
+    content: "✓";
+    font-weight: 800;
+    font-size: 13px;
+}
+
+/* Buttons */
+.nzo-btn {
+    appearance: none;
+    background: var(--surface);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    padding: 8px 16px;
+    border-radius: var(--radius-pill);
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.16s ease;
+    box-shadow: var(--shadow-sm);
+}
+
+.nzo-btn:hover {
+    background: var(--brand-blue-light);
+    color: var(--brand-blue-dark);
+    border-color: rgba(2, 132, 199, 0.35);
+    transform: translateY(-1px);
+}
+
+.nzo-btn:active {
+    transform: translateY(0);
+}
+
+/* ==========================================================================
+   KPI Summary Cards
+   ========================================================================== */
+.nzo-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+    direction: rtl;
+}
+
+.nzo-kpi-card {
+    background: var(--surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 18px 22px;
+    box-shadow: var(--shadow-sm);
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.nzo-kpi-card::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 5px;
+    height: 100%;
+    background: var(--brand-blue);
+}
+
+.nzo-kpi-card.accent-green::before {
+    background: var(--brand-green);
+}
+
+.nzo-kpi-card.accent-amber::before {
+    background: var(--brand-amber);
+}
+
+.nzo-kpi-card.accent-rose::before {
+    background: var(--brand-rose);
+}
+
+.nzo-kpi-card.accent-teal::before {
+    background: var(--brand-teal);
+}
+
+.nzo-kpi-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+}
+
+.nzo-kpi-value {
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--text-primary);
+    font-family: 'Inter', 'Heebo', sans-serif;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+    direction: ltr;
+    text-align: right;
+}
+
+.nzo-kpi-sub {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-top: 6px;
+    font-weight: 500;
+}
+
+/* ==========================================================================
+   Home Page Hero & Feature Grid
+   ========================================================================== */
+.nzo-hero {
+    background: linear-gradient(135deg, #ffffff 0%, #f0f9ff 60%, #ecfdf5 100%);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-xl);
+    padding: 40px 44px;
+    margin-bottom: 28px;
+    box-shadow: var(--shadow-md);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 32px;
+    direction: rtl;
+    position: relative;
+    overflow: hidden;
+}
+
+.nzo-hero-content {
+    max-width: 680px;
+}
+
+.nzo-hero-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--brand-teal);
+    background: rgba(16, 185, 129, 0.12);
+    padding: 5px 14px;
+    border-radius: var(--radius-pill);
+    margin-bottom: 14px;
+}
+
+.nzo-hero-title {
+    font-size: 38px;
+    font-weight: 800;
+    color: var(--text-primary);
+    margin: 0 0 12px 0;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+}
+
+.nzo-hero-desc {
+    font-size: 17px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    margin: 0;
+}
+
+.nzo-hero-logo-box {
+    background: var(--surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-xl);
+    padding: 28px 36px;
+    box-shadow: var(--shadow-lg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+.nzo-hero-logo {
+    height: 76px;
+    width: auto;
+}
+
+.nzo-feature-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+    direction: rtl;
+}
+
+.nzo-feature-card {
+    background: var(--surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 26px;
+    text-decoration: none;
+    color: inherit;
+    box-shadow: var(--shadow-sm);
+    transition: all 0.22s ease;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    position: relative;
+    overflow: hidden;
+}
+
+.nzo-feature-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-lg);
+    border-color: rgba(2, 132, 199, 0.4);
+}
+
+.nzo-feature-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    margin-bottom: 16px;
+}
+
+.nzo-feature-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0 0 8px 0;
+}
+
+.nzo-feature-desc {
+    font-size: 14.5px;
+    color: var(--text-secondary);
+    line-height: 1.55;
+    margin: 0 0 20px 0;
+}
+
+.nzo-feature-cta {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--brand-blue);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.nzo-feature-card:hover .nzo-feature-cta {
+    color: var(--brand-blue-dark);
+    gap: 10px;
+}
+
+/* ==========================================================================
+   Charts Grid Helpers
+   ========================================================================== */
+.nzo-charts-grid-2 {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(460px, 1fr));
+    gap: 20px;
+}
+
+/* RangeSlider & DatePicker Overrides */
+.rc-slider-track {
+    background-color: var(--brand-blue) !important;
+    height: 6px !important;
+}
+
+.rc-slider-rail {
+    background-color: var(--border-color) !important;
+    height: 6px !important;
+}
+
+.rc-slider-handle {
+    border: 2px solid var(--brand-blue) !important;
+    background-color: #ffffff !important;
+    width: 18px !important;
+    height: 18px !important;
+    margin-top: -6px !important;
+    box-shadow: 0 2px 6px rgba(2, 132, 199, 0.25) !important;
+}
+
+.rc-slider-mark-text {
+    font-family: 'Inter', sans-serif !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    color: var(--text-secondary) !important;
+}
+
+.DateInput_input {
+    font-family: 'Inter', 'Heebo', sans-serif !important;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    color: var(--text-primary) !important;
+    padding: 7px 10px !important;
+    border-radius: var(--radius-sm) !important;
+    text-align: center;
+}
+
+.DateRangePickerInput__withBorder {
+    border-radius: var(--radius-md) !important;
+    border: 1px solid var(--border-color) !important;
+    overflow: hidden;
+    background: var(--surface) !important;
+}
+
+@media (max-width: 900px) {
+    .nzo-navbar {
+        height: auto;
+        padding: 12px 16px;
+        flex-direction: column;
+        gap: 10px;
+    }
+    .nzo-page-container {
+        padding: 16px;
+    }
+    .nzo-hero {
+        flex-direction: column-reverse;
+        padding: 28px 24px;
+        text-align: center;
+    }
+    .nzo-charts-grid-2 {
+        grid-template-columns: 1fr;
+    }
+}

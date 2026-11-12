@@ -24,6 +24,16 @@ SOURCE_RENEWABLES = "Renewables"
 SOURCE_RATIO = "Co2Ratio"
 SOURCE_TOTAL = "Total"
 
+CO2_SOURCE_LABELS = {
+    SOURCE_GAS: "🔥 גז טבעי",
+    SOURCE_COAL: "🪨 פחם",
+    SOURCE_DIESEL: "⛽ דיזל",
+    SOURCE_MAZUT: "🛢️ מזוט",
+    SOURCE_RATIO: "📊 מקדם פליטות (tCO₂/MWh)",
+    SOURCE_TOTAL: "🏭 סה״כ פליטות",
+    SOURCE_RENEWABLES: "🌿 חיסכון ממתחדשות",
+}
+
 SOURCE_TO_DB_TAG = {
     SOURCE_DIESEL: "Gasoil",
     SOURCE_MAZUT: "Fueloil",
@@ -72,6 +82,10 @@ GREEN_COLORSCALE = [
 
 dfs = {}
 sources = []
+
+
+def _format_co2_options(src_list):
+    return [{"label": CO2_SOURCE_LABELS.get(s, s), "value": s} for s in src_list]
 
 
 def retrieve_data():
@@ -151,24 +165,52 @@ def co2_layout(nav_links):
         retrieve_data()
     return html.Div([
         nav_links,
-        dcc.Graph(
-            id=CO2_HEATMAP_ID,
-            style={'marginBottom': '0px'}
-        ),
-        dcc.RadioItems(
-            id=CO2_DISPLAY_MODE_ID,
-            options=[MODE_ABSOLUTE, MODE_PERCENT],
-            value=MODE_ABSOLUTE,
-            inline=True,
-            style={'textAlign': 'center', 'fontSize': 18, 'marginBottom': '6px'}
-        ),
-        dcc.RadioItems(
-            id=CO2_SOURCES_ID,
-            options=sources,
-            value=select_source,
-            inline=True,
-            style={'textAlign': 'center', 'fontSize': 20, 'marginTop': '0px'}
-        ),
+        html.Main([
+            html.Div([
+                html.Div([
+                    html.H1("פליטות פחמן דו-חמצני (CO₂)", className='nzo-page-title'),
+                    html.P("מעקב אחר פליטות גזי חממה מייצור חשמל לפי סוג דלק, מקדם פליטות וחיסכון בזכות אנרגיות מתחדשות", className='nzo-page-subtitle'),
+                ]),
+                html.Span("מקור הנתונים: נגה", className='nzo-source-pill'),
+            ], className='nzo-page-header'),
+
+            # Controls Toolbar Card
+            html.Div([
+                html.Div([
+                    html.Span("תצוגת נתונים:", className='nzo-control-label'),
+                    dcc.RadioItems(
+                        id=CO2_DISPLAY_MODE_ID,
+                        options=[
+                            {'label': 'ערכים מוחלטים (tCO₂)', 'value': MODE_ABSOLUTE},
+                            {'label': 'אחוז מסך הפליטות (%)', 'value': MODE_PERCENT},
+                        ],
+                        value=MODE_ABSOLUTE,
+                        inline=True,
+                        className='nzo-segmented-radio'
+                    ),
+                ], className='nzo-control-group', style={'width': '100%', 'paddingBottom': '12px', 'borderBottom': '1px solid #e2e8f0'}),
+
+                html.Div([
+                    html.Span("מקור / מדד פליטות:", className='nzo-control-label'),
+                    dcc.RadioItems(
+                        id=CO2_SOURCES_ID,
+                        options=_format_co2_options(sources),
+                        value=select_source,
+                        inline=True,
+                        className='nzo-pill-selector'
+                    ),
+                ], className='nzo-control-group', style={'width': '100%', 'paddingTop': '4px'}),
+            ], className='nzo-toolbar-card'),
+
+            # Chart Card
+            html.Div([
+                dcc.Graph(
+                    id=CO2_HEATMAP_ID,
+                    style={'marginBottom': '0px'},
+                    config={'responsive': True}
+                ),
+            ], className='nzo-card-chart'),
+        ], className='nzo-page-container'),
     ])
 
 
@@ -181,12 +223,12 @@ def register_callbacks(app):
     )
     def update_co2_source_options(display_mode, current_source):
         if display_mode == MODE_PERCENT:
-            options = [s for s in sources if s not in NON_PERCENT_SOURCES]
+            filtered = [s for s in sources if s not in NON_PERCENT_SOURCES]
             value = select_source if current_source in NON_PERCENT_SOURCES else current_source
         else:
-            options = sources
+            filtered = sources
             value = current_source
-        return options, value
+        return _format_co2_options(filtered), value
 
     @app.callback(
         Output(CO2_HEATMAP_ID, 'figure'),
@@ -216,9 +258,9 @@ def register_callbacks(app):
         if is_percent:
             scatter_y = dfs_heatmap.mean()
             scatter_customdata = None
-            scatter_hover = '<i>%{x} : %{y:,.1f}%</i><extra></extra>'
-            scatter_yaxis_label = "%"
-            heatmap_hover = '<i>%{x} %{y}</i><br>%{z:,.1f}%<extra></extra>'
+            scatter_hover = '<b>%{x}</b>: %{y:,.1f}%<extra></extra>'
+            scatter_yaxis_label = "ממוצע יומי (%)"
+            heatmap_hover = '<b>%{x} | %{y}</b><br>%{z:,.1f}%<extra></extra>'
         elif source == SOURCE_RATIO:
             if "ActualDemand" not in heatmap.dfs:
                 heatmap.retrieve_data()
@@ -229,15 +271,15 @@ def register_callbacks(app):
             else:
                 scatter_y = dfs_heatmap.mean()
             scatter_customdata = None
-            scatter_hover = '<i>%{x} : %{y:,.2f} tCO2/MWh</i><extra></extra>'
-            scatter_yaxis_label = "tCO2/MWh"
-            heatmap_hover = '<i>%{x} %{y}</i><br>%{z:,.2f} tCO2/MWh<extra></extra>'
+            scatter_hover = '<b>%{x}</b>: %{y:,.2f} tCO₂/MWh<extra></extra>'
+            scatter_yaxis_label = "tCO₂ / MWh"
+            heatmap_hover = '<b>%{x} | %{y}</b><br>%{z:,.2f} tCO₂/MWh<extra></extra>'
         else:
             scatter_y = dfs_heatmap.sum() / 12
             scatter_customdata = [_format_co2_val(v) for v in scatter_y]
-            scatter_hover = '<i>%{x} : %{customdata}</i><extra></extra>'
-            scatter_yaxis_label = "tCO2"
-            heatmap_hover = '<i>%{x} %{y}</i><br>%{z:,.2f} tCO2/h<extra></extra>'
+            scatter_hover = '<b>%{x}</b>: %{customdata}<extra></extra>'
+            scatter_yaxis_label = "פליטות יומיות (tCO₂)"
+            heatmap_hover = '<b>%{x} | %{y}</b><br>%{z:,.2f} tCO₂/h<extra></extra>'
 
         if source == SOURCE_RENEWABLES and not is_percent:
             scatter_yrange = [0, RENEWABLES_YMAX]
@@ -256,7 +298,7 @@ def register_callbacks(app):
 
         heatmap_colorscale = GREEN_COLORSCALE if source == SOURCE_RENEWABLES else BROWN_BLACK_COLORSCALE
 
-        fig = make_subplots(rows=2, cols=1, row_heights=[100, 600], vertical_spacing=0.05, shared_xaxes=True)
+        fig = make_subplots(rows=2, cols=1, row_heights=[140, 580], vertical_spacing=0.04, shared_xaxes=True)
 
         if source == SOURCE_TOTAL:
             cols = dfs_heatmap.columns
@@ -264,13 +306,13 @@ def register_callbacks(app):
             coal_y = dfs[SOURCE_COAL].reindex(columns=cols).sum() / 12
             other_y = (dfs[SOURCE_DIESEL] + dfs[SOURCE_MAZUT]).reindex(columns=cols).sum() / 12
             total_y = gas_y + coal_y + other_y
-            scatter_yaxis_label = "tCO2"
+            scatter_yaxis_label = "פליטות יומיות (tCO₂)"
             scatter_yrange = _data_yrange(total_y)
 
             for area_name, area_y, area_color in [
-                (SOURCE_GAS, gas_y, "rgb(210, 180, 140)"),
-                (SOURCE_COAL, coal_y, "rgb(120, 72, 32)"),
-                (f"{SOURCE_DIESEL} + {SOURCE_MAZUT}", other_y, "rgb(30, 18, 8)"),
+                ("גז טבעי", gas_y, "rgb(210, 180, 140)"),
+                ("פחם", coal_y, "rgb(120, 72, 32)"),
+                ("דיזל + מזוט", other_y, "rgb(30, 18, 8)"),
             ]:
                 area_pct = area_y.div(total_y).where(total_y > 0, 0) * 100
                 customdata = [
@@ -284,22 +326,26 @@ def register_callbacks(app):
                         customdata=customdata,
                         name=area_name,
                         stackgroup="one",
-                        line=dict(width=0.5, color=area_color),
+                        line=dict(width=0.6, color=area_color),
                         fillcolor=area_color,
                         hovertemplate=(
-                            f"<i>%{{x}}<br>"
+                            f"<b>%{{x}}</b><br>"
                             f"{area_name}: %{{customdata[0]}} (%{{customdata[1]}}%)<br>"
-                            f"Total: %{{customdata[2]}}</i><extra></extra>"
+                            f"סה״כ: %{{customdata[2]}}<extra></extra>"
                         ),
                     ),
                     row=1, col=1)
         else:
+            line_col = "#10b981" if source == SOURCE_RENEWABLES else "#78350f"
+            fill_col = "rgba(16, 185, 129, 0.12)" if source == SOURCE_RENEWABLES else "rgba(120, 53, 15, 0.10)"
             fig.add_trace(
                 go.Scatter(
                     x=dfs_heatmap.columns.values,
                     y=scatter_y,
                     customdata=scatter_customdata,
-                    line=dict(color="green") if source == SOURCE_RENEWABLES else None,
+                    line=dict(color=line_col, width=2),
+                    fill='tozeroy',
+                    fillcolor=fill_col,
                     hovertemplate=scatter_hover
                 ),
                 row=1, col=1)
@@ -313,29 +359,55 @@ def register_callbacks(app):
                 zmin=zmin,
                 zmax=zmax,
                 colorbar={
-                    'len': 0.8,
-                    'y': 0.4,
+                    'len': 0.78,
+                    'y': 0.39,
+                    'thickness': 16,
+                    'outlinewidth': 0,
                     'ticksuffix': '%' if is_percent else ''
                 },
                 hovertemplate=heatmap_hover
             ),
             row=2, col=1)
 
-        fig.update_xaxes(showticklabels=False, row=1, col=1)
-        fig.update_yaxes(title_text=scatter_yaxis_label, range=scatter_yrange, col=1, row=1)
+        fig.update_xaxes(showticklabels=False, gridcolor="#e2e8f0", row=1, col=1)
+        fig.update_xaxes(gridcolor="#e2e8f0", tickfont={"size": 13, "color": "#475569"}, row=2, col=1)
         fig.update_yaxes(
+            title_text=scatter_yaxis_label,
+            title_font={"size": 13, "color": "#475569"},
+            tickfont={"size": 12, "color": "#475569"},
+            gridcolor="#e2e8f0",
+            range=scatter_yrange,
+            col=1, row=1
+        )
+        fig.update_yaxes(
+            title_text="שעה ביממה",
+            title_font={"size": 13, "color": "#475569"},
             tickvals=[0, n_y - 1, n_y * 2 - 1, n_y * 3 - 1, n_y * 4 - 1],
             ticktext=['00:00', '06:00', '12:00', '18:00', '24:00'],
-            row=2, col=1)
+            tickfont={"size": 13, "color": "#475569"},
+            row=2, col=1
+        )
+
+        source_display = CO2_SOURCE_LABELS.get(source, source)
         fig.update_layout(
-            height=800,
-            showlegend=False,
+            height=760,
+            font={"family": "Heebo, Inter, sans-serif", "color": "#0f172a"},
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='#ffffff',
+            margin=dict(l=70, r=40, t=55, b=45),
+            showlegend=(source == SOURCE_TOTAL),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
             uirevision=True,
+            hoverlabel=dict(
+                bgcolor="#0f172a",
+                font_size=13,
+                font_family="Heebo, Inter, sans-serif",
+            ),
             title=go.layout.Title(
                 x=0.5,
                 xanchor='center',
-                font={"family": "Hebrew", "size": 36},
-                text='CO2 פליטות'
+                font={"family": "Heebo, Inter, sans-serif", "size": 22, "color": "#0f172a"},
+                text='CO₂ פליטות'
             ),
         )
         return fig

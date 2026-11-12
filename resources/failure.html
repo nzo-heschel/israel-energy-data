@@ -1,10 +1,34 @@
 <!DOCTYPE html>
-<html>
+<html lang="he" dir="rtl">
 <head>
-    <title>failure</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>שגיאה בהעלאת הקובץ | NZO Energy Data</title>
+    <link rel="stylesheet" href="/assets/style.css">
 </head>
 <body>
-<h1>File upload failed</h1>
-<p>Error message: {{message}}</p>
+    <header class="nzo-navbar">
+        <a href="/" class="nzo-brand">
+            <img src="/assets/logo.png" class="nzo-brand-logo" alt="NZO Logo">
+            <div class="nzo-brand-text">
+                <span class="nzo-brand-title">NZO Energy Data API</span>
+                <span class="nzo-brand-subtitle">ממשק שאילתות וניהול נתוני נגה</span>
+            </div>
+        </a>
+    </header>
+
+    <main class="nzo-page-container">
+        <div class="nzo-card" style="max-width: 520px; margin: 48px auto; padding: 36px; text-align: center;">
+            <div style="width: 60px; height: 60px; border-radius: 50%; background: #ffe4e6; color: #e11d48; font-size: 30px; display: flex; align-items: center; justify-content: center; margin: 0 auto 18px;">✕</div>
+            <h1 class="nzo-page-title" style="font-size: 24px; margin-bottom: 10px;">העלאת הקובץ נכשלה</h1>
+            <div style="background: #fff1f2; border: 1px solid #fecdd3; border-radius: 12px; padding: 14px; margin: 16px 0 24px; color: #be123c; font-size: 14px; direction: ltr;">
+                {{message}}
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: center;">
+                <a href="/upload" class="nzo-btn" style="text-decoration: none;">נסו שנית</a>
+                <a href="/" class="nzo-btn" style="text-decoration: none;">חזרה לדף הראשי</a>
+            </div>
+        </div>
+    </main>
 </body>
 </html>

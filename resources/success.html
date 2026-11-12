@@ -1,11 +1,36 @@
 <!DOCTYPE html>
-<html>
+<html lang="he" dir="rtl">
 <head>
-    <title>success</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>הקובץ הועלה בהצלחה | NZO Energy Data</title>
+    <link rel="stylesheet" href="/assets/style.css">
 </head>
 <body>
-<h1>File uploaded successfully</h1>
-<p>File Name: {{name}}</p>
-<p>Stored {{count}} values in DB</p>
+    <header class="nzo-navbar">
+        <a href="/" class="nzo-brand">
+            <img src="/assets/logo.png" class="nzo-brand-logo" alt="NZO Logo">
+            <div class="nzo-brand-text">
+                <span class="nzo-brand-title">NZO Energy Data API</span>
+                <span class="nzo-brand-subtitle">ממשק שאילתות וניהול נתוני נגה</span>
+            </div>
+        </a>
+    </header>
+
+    <main class="nzo-page-container">
+        <div class="nzo-card" style="max-width: 520px; margin: 48px auto; padding: 36px; text-align: center;">
+            <div style="width: 60px; height: 60px; border-radius: 50%; background: #d1fae5; color: #059669; font-size: 30px; display: flex; align-items: center; justify-content: center; margin: 0 auto 18px;">✓</div>
+            <h1 class="nzo-page-title" style="font-size: 24px; margin-bottom: 10px;">הקובץ הועלה ונשמר בהצלחה!</h1>
+            <p class="nzo-page-subtitle" style="margin-bottom: 20px;">שם הקובץ: <strong>{{name}}</strong></p>
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; margin-bottom: 24px;">
+                <span style="font-size: 14px; color: #64748b;">ערכים שנשמרו במסד הנתונים:</span>
+                <div style="font-size: 26px; font-weight: 800; color: #059669;">{{count}}</div>
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: center;">
+                <a href="/upload" class="nzo-btn" style="text-decoration: none;">העלאת קובץ נוסף</a>
+                <a href="/" class="nzo-btn" style="text-decoration: none;">חזרה לדף הראשי</a>
+            </div>
+        </div>
+    </main>
 </body>
 </html>

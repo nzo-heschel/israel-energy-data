@@ -24,7 +24,7 @@ def pop_df_result():
     _latest_df_result = (None, None)
     return res
 
-app = Flask(__name__, template_folder='../resources')
+app = Flask(__name__, template_folder='../resources', static_folder='../assets', static_url_path='/assets')
 
 @app.route('/')
 def index():
