@@ -398,7 +398,18 @@ def register_callbacks(app):
             line=dict(color=ui.COLOR_LINE),
             fill='tozeroy',
             fillcolor='rgba(42, 120, 214, 0.08)',
-            hovertemplate='%{x}<br>Energy: %{y:,.2f} MWh<extra></extra>'
+            hovertemplate='Energy: %{y:,.2f} MWh<extra></extra>'
+        ))
+        # Empty overlay filled client-side (assets/hover_sync.js) with the hovered day's samples
+        fig_cum.add_trace(go.Scatter(
+            x=[], y=[],
+            mode='lines',
+            name='day-highlight',
+            line=dict(color='#1a4f91', width=3),
+            fill='tozeroy',
+            fillcolor='rgba(42, 120, 214, 0.3)',
+            hoverinfo='skip',
+            showlegend=False
         ))
         
         # Add daily max charge/discharge traces
@@ -408,7 +419,7 @@ def register_callbacks(app):
             mode='lines+markers',
             name='Max Discharge',
             line=dict(color=COLOR_DISCHARGE),
-            hovertemplate='Date: %{x}<br>Max Discharge: %{y:,.2f} MW<extra></extra>'
+            hovertemplate='Max Discharge: %{y:,.2f} MW<extra></extra>'
         ))
         
         fig_daily.add_trace(go.Scatter(
@@ -417,7 +428,7 @@ def register_callbacks(app):
             mode='lines+markers',
             name='Max Charge',
             line=dict(color=COLOR_CHARGE),
-            hovertemplate='Date: %{x}<br>Max Charge: %{y:,.2f} MW<extra></extra>'
+            hovertemplate='Max Charge: %{y:,.2f} MW<extra></extra>'
         ))
         
         # Add daily energy charge/discharge traces
@@ -427,7 +438,7 @@ def register_callbacks(app):
             mode='lines+markers',
             name='Energy Discharge',
             line=dict(color=COLOR_DISCHARGE),
-            hovertemplate='Date: %{x}<br>Energy Discharge: %{y:,.2f} MWh<extra></extra>'
+            hovertemplate='Energy Discharge: %{y:,.2f} MWh<extra></extra>'
         ))
         
         fig_daily_energy.add_trace(go.Scatter(
@@ -436,7 +447,7 @@ def register_callbacks(app):
             mode='lines+markers',
             name='Energy Charge',
             line=dict(color=COLOR_CHARGE),
-            hovertemplate='Date: %{x}<br>Energy Charge: %{y:,.2f} MWh<extra></extra>'
+            hovertemplate='Energy Charge: %{y:,.2f} MWh<extra></extra>'
         ))
 
         efficiency = total_positive_energy / -total_negative_energy if total_negative_energy != 0 else 0
@@ -544,11 +555,13 @@ def register_callbacks(app):
             ui.axis_unit(fig, unit)
             fig.update_layout(
                 dragmode=False,
-                xaxis=dict(fixedrange=True),
+                # The unified tooltip shows the date once in its header
+                xaxis=dict(fixedrange=True, hoverformat='%d/%m/%Y %H:%M' if fig is fig_cum else '%d/%m/%Y'),
                 yaxis=dict(fixedrange=True, zeroline=True, zerolinecolor=ui.AXIS_LINE, zerolinewidth=1,
                            rangemode='normal' if fig is fig_cum else 'tozero'),
                 margin=dict(l=64, r=16, t=36, b=48),
                 hovermode='x unified',
+                hoverdistance=-1,  # snap to the nearest day even between the sparse daily points
                 showlegend=fig is not fig_cum,
                 legend=dict(orientation='h', x=1, xanchor='right', y=1.12),
             )
