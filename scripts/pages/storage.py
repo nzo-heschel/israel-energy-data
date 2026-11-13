@@ -419,7 +419,7 @@ def register_callbacks(app):
             mode='lines+markers',
             name='Max Discharge',
             line=dict(color=COLOR_DISCHARGE),
-            hovertemplate='Max Discharge: %{y:,.2f} MW<extra></extra>'
+            hovertemplate='%{y:,.2f} MW<extra></extra>'
         ))
         
         fig_daily.add_trace(go.Scatter(
@@ -428,7 +428,7 @@ def register_callbacks(app):
             mode='lines+markers',
             name='Max Charge',
             line=dict(color=COLOR_CHARGE),
-            hovertemplate='Max Charge: %{y:,.2f} MW<extra></extra>'
+            hovertemplate='%{y:,.2f} MW<extra></extra>'
         ))
         
         # Add daily energy charge/discharge traces
@@ -438,7 +438,7 @@ def register_callbacks(app):
             mode='lines+markers',
             name='Energy Discharge',
             line=dict(color=COLOR_DISCHARGE),
-            hovertemplate='Energy Discharge: %{y:,.2f} MWh<extra></extra>'
+            hovertemplate='%{y:,.2f} MWh<extra></extra>'
         ))
         
         fig_daily_energy.add_trace(go.Scatter(
@@ -447,7 +447,7 @@ def register_callbacks(app):
             mode='lines+markers',
             name='Energy Charge',
             line=dict(color=COLOR_CHARGE),
-            hovertemplate='Energy Charge: %{y:,.2f} MWh<extra></extra>'
+            hovertemplate='%{y:,.2f} MWh<extra></extra>'
         ))
 
         efficiency = total_positive_energy / -total_negative_energy if total_negative_energy != 0 else 0
