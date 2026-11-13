@@ -1,0 +1,92 @@
+/* Global polish on top of Mantine. Dash serves every .css in assets/ automatically. */
+
+body {
+    background: #f6f8fa;
+    -webkit-font-smoothing: antialiased;
+}
+
+.icon {
+    display: inline-block;
+    flex-shrink: 0;
+    background-color: currentColor;
+    -webkit-mask-size: contain;
+    mask-size: contain;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    mask-position: center;
+}
+
+/* Header */
+.app-header {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: saturate(180%) blur(12px);
+    -webkit-backdrop-filter: saturate(180%) blur(12px);
+}
+
+.brand-logo {
+    height: 34px;
+    width: auto;
+    display: block;
+}
+
+/* Sidebar navigation */
+.nav-link {
+    border-radius: var(--mantine-radius-md);
+    margin-bottom: 4px;
+    font-weight: 500;
+}
+
+.nav-link[data-active] {
+    font-weight: 700;
+}
+
+/* Home page */
+.hero {
+    background:
+        radial-gradient(circle at 15% 20%, rgba(32, 201, 151, 0.18), transparent 45%),
+        radial-gradient(circle at 85% 80%, rgba(42, 120, 214, 0.14), transparent 50%),
+        linear-gradient(135deg, #ffffff 0%, #f1fbf7 100%);
+}
+
+.hero-logo {
+    height: 72px;
+    width: auto;
+}
+
+.feature-card {
+    display: block;
+    height: 100%;
+    text-decoration: none;
+    color: inherit;
+    transition: transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease;
+}
+
+.feature-card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--mantine-shadow-md);
+    border-color: var(--mantine-color-teal-3);
+}
+
+.feature-card .feature-arrow {
+    transition: transform 150ms ease;
+}
+
+.feature-card:hover .feature-arrow {
+    transform: translateX(-4px);
+}
+
+.stat-value {
+    font-variant-numeric: tabular-nums;
+    direction: ltr;
+    unicode-bidi: isolate;
+}
+
+/* Charts: Plotly draws LTR internally even inside an RTL page */
+.js-plotly-plot, .dash-graph {
+    direction: ltr;
+}
+
+.chip-scroller {
+    row-gap: 8px;
+}

@@ -1,10 +1,12 @@
-from dash import dcc, html, Input, Output, clientside_callback, callback_context
+from dash import dcc, Input, Output, clientside_callback, callback_context
+from dash.exceptions import PreventUpdate
+import dash_mantine_components as dmc
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import logging
 import math
 import numpy as np
-from . import heatmap
+from . import heatmap, ui
 
 STORAGE_ID = "storage-graph"
 STORAGE_STORE_ID = "storage-graph-store"
@@ -14,7 +16,8 @@ DAILY_ENERGY_ID = "daily-energy-graph"
 STORAGE_SOURCE_ID = "storage-source-radio"
 DATE_RANGE_ID = "storage-date-range"
 STORAGE_INFO_ID = "storage-info"
-GRAPH_TYPE_ID = "graph-type-checklist"
+GRAPH_TYPE_ID = "graph-type-switch"
+STORAGE_TITLE_ID = "storage-title"
 BTN_WEEK_ID = "btn-last-week"
 BTN_MONTH_ID = "btn-last-month"
 BTN_YEAR_ID = "btn-last-year"
@@ -25,10 +28,11 @@ XY_END_TIME = datetime(1900, 1, 2, 0, 0)
 
 VALUE_BATTERIES = 'BatteriesNet'
 VALUE_PSP = 'PspNet'
-VALUE_XY_GRAPH = 'xy'
 
-COLOR_DISCHARGE = 'green'
-COLOR_CHARGE = 'red'
+SOURCE_TITLES = {VALUE_BATTERIES: 'אגירה בסוללות', VALUE_PSP: 'אגירה שאובה'}
+
+COLOR_DISCHARGE = ui.COLOR_DISCHARGE
+COLOR_CHARGE = ui.COLOR_CHARGE
 
 # Global variables to store state
 last_start_date = None
@@ -59,7 +63,7 @@ def get_date_range_bounds():
         
     return min_date, max_date
 
-def storage_layout(nav_links):
+def storage_layout():
     global last_start_date, last_end_date, last_source
     
     min_date, max_date = get_date_range_bounds()
@@ -71,12 +75,12 @@ def storage_layout(nav_links):
     if last_start_date is None:
         start_date = today - timedelta(days=7)
     else:
-        start_date = datetime.strptime(last_start_date, '%Y-%m-%d').date() if isinstance(last_start_date, str) else last_start_date
+        start_date = datetime.fromisoformat(last_start_date).date() if isinstance(last_start_date, str) else last_start_date
         
     if last_end_date is None:
         end_date = yesterday
     else:
-        end_date = datetime.strptime(last_end_date, '%Y-%m-%d').date() if isinstance(last_end_date, str) else last_end_date
+        end_date = datetime.fromisoformat(last_end_date).date() if isinstance(last_end_date, str) else last_end_date
         
     # Ensure start/end dates are within bounds
     if start_date < min_date:
@@ -86,81 +90,69 @@ def storage_layout(nav_links):
     if start_date > end_date:
         start_date = end_date
     
-    button_style = {
-        'marginRight': '5px', 
-        'marginTop': '10px', 
-        'padding': '5px 10px', 
-        'fontSize': '14px',
-        'cursor': 'pointer'
-    }
+    controls = dmc.Card(dmc.Stack([
+        dmc.Box([
+            ui.control_label('סוג אגירה'),
+            dmc.SegmentedControl(
+                id=STORAGE_SOURCE_ID,
+                data=[{'label': title, 'value': value} for value, title in SOURCE_TITLES.items()],
+                value=last_source,
+                fullWidth=True,
+            ),
+        ]),
+        dmc.Box([
+            ui.control_label('טווח תאריכים'),
+            dmc.DatePickerInput(
+                id=DATE_RANGE_ID,
+                type='range',
+                value=[start_date.isoformat(), end_date.isoformat()],
+                minDate=min_date.isoformat(),
+                maxDate=max_date.isoformat(),
+                valueFormat='DD/MM/YYYY',
+                allowSingleDateInRange=True,
+                dropdownType='modal',
+                # Keep "start – end" in reading order inside the RTL page
+                styles={'input': {'direction': 'ltr', 'textAlign': 'right'}},
+            ),
+            dmc.Group([
+                dmc.Button('שבוע אחרון', id=BTN_WEEK_ID, n_clicks=0, variant='light', size='compact-sm'),
+                dmc.Button('חודש אחרון', id=BTN_MONTH_ID, n_clicks=0, variant='light', size='compact-sm'),
+                dmc.Button('שנה אחרונה', id=BTN_YEAR_ID, n_clicks=0, variant='light', size='compact-sm'),
+            ], gap=6, mt='xs'),
+        ]),
+        dmc.Switch(id=GRAPH_TYPE_ID, label='גרף מלבני (במקום קוטבי)', checked=False),
+    ], gap='lg'))
 
-    return html.Div([
-        nav_links,
+    def small_chart(graph_id, title, subtitle):
+        return ui.chart_card(dcc.Graph(id=graph_id, style={'height': '340px'}, config=ui.GRAPH_CONFIG),
+                             title=title, subtitle=subtitle)
+
+    return dmc.Stack([
+        ui.page_header('אגירת אנרגיה', 'פרופיל יומי של טעינה (שלילי) ופריקה (חיובי). ריחוף מעל יום מדגיש אותו.', 'battery'),
         dcc.Store(id=STORAGE_STORE_ID),
-        html.Div([
-            html.Div([
-                dcc.DatePickerRange(
-                    id=DATE_RANGE_ID,
-                    min_date_allowed=min_date,
-                    max_date_allowed=max_date,
-                    initial_visible_month=end_date,
-                    start_date=start_date,
-                    end_date=end_date,
-                    display_format='DD/MM/YYYY',
-                    with_portal=True,
-                    style={'fontSize': '10px', 'transform': 'scale(0.8)', 'transformOrigin': 'top left'}
-                ),
-                html.Div([
-                    html.Button('שבוע אחרון', id=BTN_WEEK_ID, n_clicks=0, style=button_style),
-                    html.Button('חודש אחרון', id=BTN_MONTH_ID, n_clicks=0, style=button_style),
-                    html.Button('שנה אחרונה', id=BTN_YEAR_ID, n_clicks=0, style=button_style),
-                ], style={'display': 'flex', 'flexWrap': 'wrap'}),
-                dcc.RadioItems(
-                    id=STORAGE_SOURCE_ID,
-                    options=[
-                        {'label': 'אגירה בסוללות', 'value': VALUE_BATTERIES},
-                        {'label': 'אגירה שאובה', 'value': VALUE_PSP}
-                    ],
-                    value=last_source,
-                    style={'marginTop': '20px', 'fontSize': 20}
-                ),
-                dcc.Checklist(
-                    id=GRAPH_TYPE_ID,
-                    options=[{'label': 'גרף מלבני', 'value': VALUE_XY_GRAPH}],
-                    value=[],
-                    style={'marginTop': '20px', 'fontSize': 18}
-                )
-            ], style={'flex': '1', 'padding': '20px', 'boxSizing': 'border-box'}),
-            
-            html.Div([
+        dmc.Grid([
+            dmc.GridCol(dmc.Stack([
+                controls,
+                dmc.Stack(id=STORAGE_INFO_ID, gap='sm'),
+            ], gap='md'), span={'base': 12, 'md': 4, 'lg': 3}),
+            dmc.GridCol(ui.chart_card(
                 dcc.Graph(
-                    id=STORAGE_ID, 
-                    style={'width': '100%', 'height': '80vh'},
-                    config={'displayModeBar': False, 'scrollZoom': False, 'responsive': True},
+                    id=STORAGE_ID,
+                    style={'width': '100%', 'height': 'max(520px, 72vh)'},
+                    config={**ui.GRAPH_CONFIG, 'scrollZoom': False},
                     clear_on_unhover=True
-                )
-            ], style={'flex': '6', 'overflow': 'hidden'}),
-            
-            html.Div(id=STORAGE_INFO_ID, style={'flex': '1', 'padding': '20px', 'textAlign': 'right', 'direction': 'rtl', 'boxSizing': 'border-box'})
-            
-        ], style={'display': 'flex', 'flexDirection': 'row', 'width': '100%', 'alignItems': 'flex-start'}),
-        
-        dcc.Graph(
-            id=CUMULATIVE_ID, 
-            style={'width': '100%', 'height': '40vh'},
-            config={'displayModeBar': False, 'scrollZoom': False, 'responsive': True}
-        ),
-        dcc.Graph(
-            id=DAILY_ID, 
-            style={'width': '100%', 'height': '40vh'},
-            config={'displayModeBar': False, 'scrollZoom': False, 'responsive': True}
-        ),
-        dcc.Graph(
-            id=DAILY_ENERGY_ID, 
-            style={'width': '100%', 'height': '40vh'},
-            config={'displayModeBar': False, 'scrollZoom': False, 'responsive': True}
-        )
-    ])
+                ),
+                title=dmc.Text(id=STORAGE_TITLE_ID, fw=700, size='lg', span=True),
+                subtitle='הספק (MW) לפי שעה ביום – כל קו/נקודה מייצגים יום אחד',
+            ), span={'base': 12, 'md': 8, 'lg': 9}),
+        ], gutter='md'),
+        small_chart(CUMULATIVE_ID, 'אנרגיה מצטברת', 'MWh · סכום מצטבר של טעינה ופריקה לאורך הטווח'),
+        dmc.SimpleGrid([
+            small_chart(DAILY_ID, 'הספק מקסימלי יומי', 'MW'),
+            small_chart(DAILY_ENERGY_ID, 'אנרגיה יומית', 'MWh'),
+        ], cols={'base': 1, 'lg': 2}, spacing='md'),
+    ], gap='md')
+
 
 def register_callbacks(app):
     # Client-side callback for highlighting
@@ -227,29 +219,32 @@ def register_callbacks(app):
          Output(DAILY_ID, 'figure'),
          Output(DAILY_ENERGY_ID, 'figure'),
          Output(STORAGE_INFO_ID, 'children'),
-         Output(DATE_RANGE_ID, 'start_date'),
-         Output(DATE_RANGE_ID, 'end_date'),
-         Output(DATE_RANGE_ID, 'min_date_allowed'),
-         Output(DATE_RANGE_ID, 'max_date_allowed')],
-        [Input(DATE_RANGE_ID, 'start_date'),
-         Input(DATE_RANGE_ID, 'end_date'),
+         Output(STORAGE_TITLE_ID, 'children'),
+         Output(DATE_RANGE_ID, 'value'),
+         Output(DATE_RANGE_ID, 'minDate'),
+         Output(DATE_RANGE_ID, 'maxDate')],
+        [Input(DATE_RANGE_ID, 'value'),
          Input(STORAGE_SOURCE_ID, 'value'),
-         Input(GRAPH_TYPE_ID, 'value'),
+         Input(GRAPH_TYPE_ID, 'checked'),
          Input(BTN_WEEK_ID, 'n_clicks'),
          Input(BTN_MONTH_ID, 'n_clicks'),
          Input(BTN_YEAR_ID, 'n_clicks')]
     )
-    def update_storage_graph(start_date, end_date, source, graph_type, _btn_week, _btn_month, _btn_year):
+    def update_storage_graph(date_range, source, is_xy, _btn_week, _btn_month, _btn_year):
         global last_start_date, last_end_date, last_source
         
         ctx = callback_context
         triggered_id = ctx.triggered[0]['prop_id'].split('.')[0] if ctx.triggered else None
+        start_date, end_date = (list(date_range or []) + [None, None])[:2]
+        # The range picker reports a half-picked range while the user is still choosing the end date
+        if triggered_id == DATE_RANGE_ID and not (start_date and end_date):
+            raise PreventUpdate
         
         today = datetime.now().date()
         yesterday = today - timedelta(days=1)
         
         # Recalculate bounds on every callback to ensure they are up to date
-        min_date_allowed, max_date_allowed = get_date_range_bounds()
+        min_date_allowed, max_date_allowed = (d.isoformat() for d in get_date_range_bounds())
 
         if triggered_id == BTN_WEEK_ID:
             end_date = yesterday.strftime('%Y-%m-%d')
@@ -266,14 +261,16 @@ def register_callbacks(app):
         last_end_date = end_date
         last_source = source
         
-        is_xy = VALUE_XY_GRAPH in (graph_type or [])
+        is_xy = bool(is_xy)
+        title_text = SOURCE_TITLES.get(source, source)
+        date_value = [start_date, end_date]
         
         # Ensure data is available (refresh if needed, handled by retrieve_data logic)
         heatmap.retrieve_data()
         
         if source not in heatmap.dfs:
             logging.warning(f"Source {source} not found in heatmap.dfs")
-            return go.Figure(), go.Figure(), go.Figure(), go.Figure(), [], start_date, end_date, min_date_allowed, max_date_allowed
+            return go.Figure(), go.Figure(), go.Figure(), go.Figure(), [], title_text, date_value, min_date_allowed, max_date_allowed
             
         df = heatmap.dfs[source]
         
@@ -292,7 +289,7 @@ def register_callbacks(app):
         df_filtered = df[cols]
         
         if df_filtered.empty:
-            return go.Figure(), go.Figure(), go.Figure(), go.Figure(), [], start_date, end_date, min_date_allowed, max_date_allowed
+            return go.Figure(), go.Figure(), go.Figure(), go.Figure(), [], title_text, date_value, min_date_allowed, max_date_allowed
 
         fig_main = go.Figure()
         fig_cum = go.Figure()
@@ -392,7 +389,9 @@ def register_callbacks(app):
             y=cumulative_y,
             mode='lines',
             name='Cumulative Energy',
-            line=dict(color='blue'),
+            line=dict(color=ui.COLOR_LINE),
+            fill='tozeroy',
+            fillcolor='rgba(42, 120, 214, 0.08)',
             hovertemplate='%{x}<br>Energy: %{y:,.2f} MWh<extra></extra>'
         ))
         
@@ -436,13 +435,11 @@ def register_callbacks(app):
 
         efficiency = total_positive_energy / -total_negative_energy if total_negative_energy != 0 else 0
 
-        info_children = html.Div([
-            html.P(f'פריקה מקסימלית: {max_power_discharging_total:,.2f} MW', style={'fontSize': '20px'}),
-            html.P(f'טעינה מקסימלית: {-max_power_charging_total:,.2f} MW', style={'fontSize': '20px'}),
-            html.P(f'נצילות: {efficiency:.2%}', style={'fontSize': '20px'})
-        ])
-
-        title_text = 'אגירה בסוללות' if source == VALUE_BATTERIES else 'אגירה שאובה'
+        info_children = [
+            ui.stat_card('פריקה מקסימלית', f'{max_power_discharging_total:,.0f} MW', 'arrow-up', color='teal'),
+            ui.stat_card('טעינה מקסימלית', f'{-max_power_charging_total:,.0f} MW', 'arrow-down', color='orange'),
+            ui.stat_card('נצילות', f'{efficiency:.1%}', 'gauge', color='blue', hint='אנרגיה שנפרקה / אנרגיה שנטענה'),
+        ]
 
         # Main Figure Layout
         if is_xy:
@@ -453,24 +450,17 @@ def register_callbacks(app):
             # Ensure the range covers 24:00 with a small padding
             range_x = [XY_START_TIME - timedelta(minutes=10), XY_END_TIME + timedelta(minutes=10)]
             
+            ui.axis_unit(fig_main, "MW")
             fig_main.update_layout(
-                title=go.layout.Title(
-                    x=0.5, xanchor='center', font={"family": "Hebrew", "size": 36}, text=title_text
-                ),
-                paper_bgcolor='white',
-                plot_bgcolor='white',
-                dragmode=False,
                 xaxis=dict(
-                    title="זמן", 
-                    gridcolor='lightgrey', 
                     tickformat="%H:%M", 
                     fixedrange=True,
                     tickvals=tickvals,
                     ticktext=ticktext,
                     range=range_x # Explicitly set range to include 24:00 with padding
                 ),
-                yaxis=dict(title="הספק (MW)", gridcolor='lightgrey', fixedrange=True, zeroline=True, zerolinecolor='lightgrey', zerolinewidth=1),
-                margin=dict(l=40, r=40, t=60, b=40),
+                yaxis=dict(fixedrange=True, zeroline=True, zerolinecolor=ui.TEXT_MUTED, zerolinewidth=1),
+                margin=dict(l=56, r=24, t=36, b=48),
                 showlegend=False
             )
             
@@ -508,25 +498,18 @@ def register_callbacks(app):
             range_vals = [r_min, r_max + (nice_step / 10) if len(all_power_values_flat) > 0 else 1]
 
             fig_main.update_layout(
-                title=go.layout.Title(
-                    x=0.5, xanchor='center', font={"family": "Hebrew", "size": 36}, text=title_text
-                ),
-                paper_bgcolor='white',
-                dragmode=False,
-                margin=dict(l=40, r=40, t=60, b=40),
+                margin=dict(l=40, r=40, t=32, b=32),
                 polar=dict(
-                    bgcolor="white",
                     radialaxis=dict(
                         visible=True,
                         range=range_vals,
                         tickvals=tickvals,
-                        gridcolor='darkgrey'
+                        tickfont=dict(size=11, color=ui.TEXT_MUTED),
                     ),
                     angularaxis=dict(
                         direction="clockwise", rotation=90, tickmode='array',
                         tickvals=[0, 45, 90, 135, 180, 225, 270, 315],
                         ticktext=['00:00', '03:00', '06:00', '09:00', '12:00', '15:00', '18:00', '21:00'],
-                        gridcolor='darkgrey'
                     )
                 ),
                 showlegend=False
@@ -540,45 +523,22 @@ def register_callbacks(app):
                 r=zero_line_r,
                 theta=zero_line_theta,
                 mode='lines',
-                line=dict(color='black', width=2),
+                line=dict(color=ui.TEXT_SECONDARY, width=1.5),
                 hoverinfo='skip',
                 showlegend=False
             ))
 
-        # Cumulative Figure Layout
-        fig_cum.update_layout(
-            title=go.layout.Title(text="אנרגיה מצטברת (MWh)", x=0.5, xanchor='center', font={"family": "Hebrew", "size": 24}),
-            paper_bgcolor='white',
-            plot_bgcolor='white',
-            dragmode=False,
-            xaxis=dict(title="זמן", gridcolor='lightgrey', fixedrange=True),
-            yaxis=dict(title="אנרגיה (MWh)", gridcolor='lightgrey', fixedrange=True, zeroline=True, zerolinecolor='lightgrey', zerolinewidth=1),
-            margin=dict(l=40, r=40, t=40, b=40),
-            showlegend=False
-        )
+        # Secondary figures share one layout: titles live in the surrounding cards
+        for fig, unit in [(fig_cum, "MWh"), (fig_daily, "MW"), (fig_daily_energy, "MWh")]:
+            ui.axis_unit(fig, unit)
+            fig.update_layout(
+                xaxis=dict(fixedrange=True),
+                yaxis=dict(fixedrange=True, zeroline=True, zerolinecolor=ui.AXIS_LINE, zerolinewidth=1,
+                           rangemode='normal' if fig is fig_cum else 'tozero'),
+                margin=dict(l=64, r=16, t=36, b=48),
+                hovermode='x unified',
+                showlegend=fig is not fig_cum,
+                legend=dict(orientation='h', x=1, xanchor='right', y=1.12),
+            )
 
-        # Daily Figure Layout
-        fig_daily.update_layout(
-            title=go.layout.Title(text="הספק מקסימלי יומי (MW)", x=0.5, xanchor='center', font={"family": "Hebrew", "size": 24}),
-            paper_bgcolor='white',
-            plot_bgcolor='white',
-            dragmode=False,
-            xaxis=dict(title="תאריך", gridcolor='lightgrey', fixedrange=True),
-            yaxis=dict(title="הספק (MW)", gridcolor='lightgrey', fixedrange=True, rangemode='tozero', zeroline=True, zerolinecolor='lightgrey', zerolinewidth=1),
-            margin=dict(l=40, r=40, t=40, b=40),
-            showlegend=False
-        )
-        
-        # Daily Energy Figure Layout
-        fig_daily_energy.update_layout(
-            title=go.layout.Title(text="אנרגיה יומית (MWh)", x=0.5, xanchor='center', font={"family": "Hebrew", "size": 24}),
-            paper_bgcolor='white',
-            plot_bgcolor='white',
-            dragmode=False,
-            xaxis=dict(title="תאריך", gridcolor='lightgrey', fixedrange=True),
-            yaxis=dict(title="אנרגיה (MWh)", gridcolor='lightgrey', fixedrange=True, rangemode='tozero', zeroline=True, zerolinecolor='lightgrey', zerolinewidth=1),
-            margin=dict(l=40, r=40, t=40, b=40),
-            showlegend=False
-        )
-        
-        return fig_main, fig_cum, fig_daily, fig_daily_energy, info_children, start_date, end_date, min_date_allowed, max_date_allowed
+        return fig_main, fig_cum, fig_daily, fig_daily_energy, info_children, title_text, date_value, min_date_allowed, max_date_allowed

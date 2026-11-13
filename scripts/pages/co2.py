@@ -1,4 +1,5 @@
-from dash import dcc, html, Input, Output, State
+from dash import dcc, Input, Output, State
+import dash_mantine_components as dmc
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from datetime import datetime
@@ -8,7 +9,7 @@ import time as time_module
 import pandas as pd
 
 from scripts import server, utils
-from . import heatmap
+from . import heatmap, ui
 
 CO2_HEATMAP_ID = "co2-heatmap-graph"
 CO2_SOURCES_ID = "co2-sources-radioitems"
@@ -48,6 +49,21 @@ WANTED_SOURCES = [
     SOURCE_RENEWABLES,
 ]
 NON_PERCENT_SOURCES = {SOURCE_TOTAL, SOURCE_RATIO}
+
+SOURCE_LABELS = {
+    SOURCE_GAS: "גז טבעי",
+    SOURCE_COAL: "פחם",
+    SOURCE_DIESEL: "סולר",
+    SOURCE_MAZUT: "מזוט",
+    SOURCE_RATIO: "יחס פליטות (tCO2/MWh)",
+    SOURCE_TOTAL: 'סה"כ פליטות',
+    SOURCE_RENEWABLES: "חיסכון ממתחדשות",
+}
+
+DISPLAY_MODES = [
+    {"label": "ערכים מוחלטים", "value": MODE_ABSOLUTE},
+    {"label": "אחוז מסך הפליטות", "value": MODE_PERCENT},
+]
 
 select_source = SOURCE_GAS
 start_date = "01-01-2024"
@@ -146,35 +162,28 @@ def _data_yrange(*scatter_series_list):
     return [0, ymax + pad]
 
 
-def co2_layout(nav_links):
+def co2_layout():
     if not sources:
         retrieve_data()
-    return html.Div([
-        nav_links,
-        dcc.Graph(
-            id=CO2_HEATMAP_ID,
-            style={'marginBottom': '0px'}
-        ),
-        dcc.RadioItems(
-            id=CO2_DISPLAY_MODE_ID,
-            options=[MODE_ABSOLUTE, MODE_PERCENT],
-            value=MODE_ABSOLUTE,
-            inline=True,
-            style={'textAlign': 'center', 'fontSize': 18, 'marginBottom': '6px'}
-        ),
-        dcc.RadioItems(
-            id=CO2_SOURCES_ID,
-            options=sources,
-            value=select_source,
-            inline=True,
-            style={'textAlign': 'center', 'fontSize': 20, 'marginTop': '0px'}
-        ),
-    ])
+    controls = dmc.Stack([
+        dmc.SegmentedControl(id=CO2_DISPLAY_MODE_ID, data=DISPLAY_MODES, value=MODE_ABSOLUTE, w='fit-content'),
+        dmc.Box([
+            ui.control_label('מקור פליטה'),
+            dmc.ChipGroup(dmc.Group(heatmap.source_chips(sources, SOURCE_LABELS), gap=8, className='chip-scroller'),
+                          id=CO2_SOURCES_ID, value=select_source, multiple=False, deselectable=False),
+        ]),
+    ], gap='md')
+
+    return dmc.Stack([
+        ui.page_header('פליטות CO2', 'פליטות לפי שעה ביום ולאורך זמן, לפי סוג דלק. הגרף העליון מציג את הסכום היומי.', 'cloud'),
+        dmc.Card(controls),
+        ui.chart_card(dcc.Graph(id=CO2_HEATMAP_ID, config=ui.GRAPH_CONFIG)),
+    ], gap='md')
 
 
 def register_callbacks(app):
     @app.callback(
-        Output(CO2_SOURCES_ID, 'options'),
+        Output(CO2_SOURCES_ID, 'children'),
         Output(CO2_SOURCES_ID, 'value'),
         Input(CO2_DISPLAY_MODE_ID, 'value'),
         State(CO2_SOURCES_ID, 'value')
@@ -186,7 +195,7 @@ def register_callbacks(app):
         else:
             options = sources
             value = current_source
-        return options, value
+        return dmc.Group(heatmap.source_chips(options, SOURCE_LABELS), gap=8, className='chip-scroller'), value
 
     @app.callback(
         Output(CO2_HEATMAP_ID, 'figure'),
@@ -299,7 +308,7 @@ def register_callbacks(app):
                     x=dfs_heatmap.columns.values,
                     y=scatter_y,
                     customdata=scatter_customdata,
-                    line=dict(color="green") if source == SOURCE_RENEWABLES else None,
+                    line=dict(color=ui.COLOR_RENEWABLE if source == SOURCE_RENEWABLES else ui.COLOR_LINE),
                     hovertemplate=scatter_hover
                 ),
                 row=1, col=1)
@@ -313,8 +322,8 @@ def register_callbacks(app):
                 zmin=zmin,
                 zmax=zmax,
                 colorbar={
-                    'len': 0.8,
-                    'y': 0.4,
+                    'len': 0.85,
+                    'y': 0.42,
                     'ticksuffix': '%' if is_percent else ''
                 },
                 hovertemplate=heatmap_hover
@@ -322,20 +331,18 @@ def register_callbacks(app):
             row=2, col=1)
 
         fig.update_xaxes(showticklabels=False, row=1, col=1)
-        fig.update_yaxes(title_text=scatter_yaxis_label, range=scatter_yrange, col=1, row=1)
+        fig.update_yaxes(range=scatter_yrange, col=1, row=1)
+        ui.axis_unit(fig, scatter_yaxis_label)
         fig.update_yaxes(
             tickvals=[0, n_y - 1, n_y * 2 - 1, n_y * 3 - 1, n_y * 4 - 1],
             ticktext=['00:00', '06:00', '12:00', '18:00', '24:00'],
             row=2, col=1)
+        fig.update_xaxes(showline=False)
         fig.update_layout(
-            height=800,
-            showlegend=False,
+            height=760,
+            showlegend=source == SOURCE_TOTAL,
+            legend={"orientation": "h", "x": 0, "y": 1.06},
+            margin={"t": 32, "r": 16},
             uirevision=True,
-            title=go.layout.Title(
-                x=0.5,
-                xanchor='center',
-                font={"family": "Hebrew", "size": 36},
-                text='CO2 פליטות'
-            ),
         )
         return fig

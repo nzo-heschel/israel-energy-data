@@ -1,4 +1,5 @@
-from dash import dcc, html, Input, Output, State, callback_context
+from dash import dcc, Input, Output, State, callback_context
+import dash_mantine_components as dmc
 from dash.exceptions import PreventUpdate
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -9,18 +10,42 @@ import time as time_module
 import pandas as pd
 
 from scripts import server, utils
+from . import ui
 
 HEATMAP_ID = "heatmap-graph"
 SOURCES_ID = "sources-radioitems"
 FREEZE_SCALE_ID = "freeze-scale"
 DISPLAY_MODE_ID = "display-mode-radioitems"
-FREEZE_SCALE_VALUE = "Freeze Scale"
 MODE_ABSOLUTE = "Absolute"
 MODE_PERCENT = "Percent"
 
 STORAGE_NET_SOURCES = {"PspNet", "BatteriesNet"}
-COLOR_DISCHARGE = "green"
-COLOR_CHARGE = "red"
+COLOR_DISCHARGE = ui.COLOR_DISCHARGE
+COLOR_CHARGE = ui.COLOR_CHARGE
+
+SOURCE_LABELS = {
+    "Coal": "פחם",
+    "Gas": "גז טבעי",
+    "Diesel": "סולר",
+    "Mazut": "מזוט",
+    "Other": "אחר",
+    "Pv": "פוטו-וולטאי",
+    "PvWithStorage": "PV משולב אגירה",
+    "Thermo": "תרמו-סולארי",
+    "Wind": "רוח",
+    "BioGas": "ביוגז",
+    "RenewableSum": 'סה"כ מתחדשות',
+    "ActualDemand": "ביקוש בפועל",
+    "Psp": "אגירה שאובה",
+    "PspNet": "אגירה שאובה (נטו)",
+    "BatteriesNet": "סוללות (נטו)",
+    "Storage": "אגירה",
+}
+
+DISPLAY_MODES = [
+    {"label": "ערכים מוחלטים", "value": MODE_ABSOLUTE},
+    {"label": "אחוז מהביקוש", "value": MODE_PERCENT},
+]
 
 select_source = "Pv"
 start_date = "01-01-2024"
@@ -109,46 +134,33 @@ def _data_yrange(*scatter_series_list):
     return [ymin - pad, ymax + pad]
 
 
-def heatmap_layout(nav_links):
-    return html.Div([
-        nav_links,
-        dcc.Graph(
-            id=HEATMAP_ID,
-            style={'marginBottom': '0px'}
-        ),
-        html.Div([
-            dcc.Checklist(id=FREEZE_SCALE_ID, options=[FREEZE_SCALE_VALUE], value=[])
-        ],
-            style={
-                'display': 'flex',
-                'justifyContent': 'flex-end',
-                'width': '100%',
-                'marginRight': '20px',
-                'marginTop': '-50px',
-                'marginBottom': '50px',
-                'position': 'relative',
-                'zIndex': '10'
-            }
-        ),
-        dcc.RadioItems(
-            id=DISPLAY_MODE_ID,
-            options=[MODE_ABSOLUTE, MODE_PERCENT],
-            value=MODE_ABSOLUTE,
-            inline=True,
-            style={'textAlign': 'center', 'fontSize': 18, 'marginBottom': '6px'}
-        ),
-        dcc.RadioItems(
-            id=SOURCES_ID,
-            options=sources,
-            value=select_source,
-            inline=True,
-            style={'textAlign': 'center', 'fontSize': 20, 'marginTop': '0px'}),
-    ])
+def source_chips(source_names, labels=SOURCE_LABELS):
+    return [dmc.Chip(labels.get(name, name), value=name) for name in source_names]
+
+
+def heatmap_layout():
+    controls = dmc.Stack([
+        dmc.Group([
+            dmc.SegmentedControl(id=DISPLAY_MODE_ID, data=DISPLAY_MODES, value=MODE_ABSOLUTE),
+            dmc.Switch(id=FREEZE_SCALE_ID, label='הקפאת סקאלה', checked=False),
+        ], justify='space-between', wrap='wrap'),
+        dmc.Box([
+            ui.control_label('מקור ייצור'),
+            dmc.ChipGroup(dmc.Group(source_chips(sources), gap=8, className='chip-scroller'),
+                          id=SOURCES_ID, value=select_source, multiple=False, deselectable=False),
+        ]),
+    ], gap='md')
+
+    return dmc.Stack([
+        ui.page_header('תמהיל הייצור', 'הספק לפי שעה ביום (ציר אנכי) ולאורך זמן (ציר אופקי). הגרף העליון מציג את האנרגיה היומית.', 'layers'),
+        dmc.Card(controls),
+        ui.chart_card(dcc.Graph(id=HEATMAP_ID, config=ui.GRAPH_CONFIG)),
+    ], gap='md')
 
 
 def register_callbacks(app):
     @app.callback(
-        Output(SOURCES_ID, 'options'),
+        Output(SOURCES_ID, 'children'),
         Output(SOURCES_ID, 'value'),
         Input(DISPLAY_MODE_ID, 'value'),
         State(SOURCES_ID, 'value')
@@ -160,17 +172,17 @@ def register_callbacks(app):
         else:
             options = sources
             value = current_source
-        return options, value
+        return dmc.Group(source_chips(options), gap=8, className='chip-scroller'), value
 
     @app.callback(
         Output(HEATMAP_ID, 'figure'),
         [Input(SOURCES_ID, 'value'),
-         Input(FREEZE_SCALE_ID, 'value'),
+         Input(FREEZE_SCALE_ID, 'checked'),
          Input(DISPLAY_MODE_ID, 'value')]
     )
-    def update_heatmap_output(source, freeze_scale_value, display_mode):
+    def update_heatmap_output(source, freeze_checked, display_mode):
         global dfs, global_freeze_source, last_zrange, last_scatter_yrange
-        freeze_checked = FREEZE_SCALE_VALUE in freeze_scale_value
+        freeze_checked = bool(freeze_checked)
         is_percent = display_mode == MODE_PERCENT
         triggered_id = callback_context.triggered[0]['prop_id'].split('.')[0]
 
@@ -183,7 +195,7 @@ def register_callbacks(app):
 
         retrieve_data()
         logging.info(f"Update heatmap: {source} [{display_mode}]"
-                     f"{(' (' + FREEZE_SCALE_VALUE + ')') if freeze_checked else ''}")
+                     f"{' (frozen scale)' if freeze_checked else ''}")
 
         source_df = dfs[source]
 
@@ -277,6 +289,9 @@ def register_callbacks(app):
                 go.Scatter(
                     x=dfs_heatmap.columns.values,
                     y=scatter_y,
+                    line=dict(color=ui.COLOR_LINE),
+                    fill='tozeroy',
+                    fillcolor='rgba(42, 120, 214, 0.08)',
                     hovertemplate=scatter_hover
                 ),
                 row=1, col=1)
@@ -290,9 +305,10 @@ def register_callbacks(app):
                 zmin=zmin,
                 zmax=zmax,
                 colorbar={
-                    'len': 0.8,
-                    'y': 0.4,
-                    'ticksuffix': '%' if is_percent else ''
+                    'len': 0.85,
+                    'y': 0.42,
+                    'ticksuffix': '%' if is_percent else '',
+                    'title': {'text': '' if is_percent else 'MW', 'side': 'top'},
                 },
                 hovertemplate=heatmap_hover
             ),
@@ -302,20 +318,18 @@ def register_callbacks(app):
         # Always set an explicit range on the scatter Y axis — this is the only reliable
         # way to control it. Plotly ignores uirevision for axis range when new trace data
         # is provided, so we must own the range completely rather than delegating to Plotly.
-        fig.update_yaxes(title_text=scatter_yaxis_label, range=scatter_yrange, col=1, row=1)
+        fig.update_yaxes(range=scatter_yrange, col=1, row=1)
+        ui.axis_unit(fig, scatter_yaxis_label)
         fig.update_yaxes(
             tickvals=[0, n_y - 1, n_y * 2 - 1, n_y * 3 - 1, n_y * 4 - 1],
             ticktext=['00:00', '06:00', '12:00', '18:00', '24:00'],
             row=2, col=1)
+        fig.update_xaxes(showline=False)
         fig.update_layout(
-            height=800,
+            height=760,
             showlegend=show_pos_neg,
+            legend={"orientation": "h", "x": 0, "y": 1.06},
+            margin={"t": 32, "r": 16},
             uirevision=True,
-            title=go.layout.Title(
-                x=0.5,
-                xanchor='center',
-                font={"family": "Hebrew", "size": 36},
-                text='תמהיל הייצור'
-            ),
         )
         return fig
