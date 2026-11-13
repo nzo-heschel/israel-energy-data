@@ -51,13 +51,23 @@ WANTED_SOURCES = [
 NON_PERCENT_SOURCES = {SOURCE_TOTAL, SOURCE_RATIO}
 
 SOURCE_LABELS = {
-    SOURCE_GAS: "גז טבעי",
+    SOURCE_GAS: "גז",
     SOURCE_COAL: "פחם",
     SOURCE_DIESEL: "סולר",
     SOURCE_MAZUT: "מזוט",
     SOURCE_RATIO: "יחס פליטות (tCO2/MWh)",
     SOURCE_TOTAL: 'סה"כ פליטות',
     SOURCE_RENEWABLES: "חיסכון ממתחדשות",
+}
+
+SOURCE_ICONS = {
+    SOURCE_GAS: "🔥",
+    SOURCE_COAL: "🪨",
+    SOURCE_DIESEL: "⛽",
+    SOURCE_MAZUT: "🛢️",
+    SOURCE_RATIO: "⚖️",
+    SOURCE_TOTAL: "🏭",
+    SOURCE_RENEWABLES: "🌱",
 }
 
 DISPLAY_MODES = [
@@ -169,7 +179,7 @@ def co2_layout():
         dmc.SegmentedControl(id=CO2_DISPLAY_MODE_ID, data=DISPLAY_MODES, value=MODE_ABSOLUTE, w='fit-content'),
         dmc.Box([
             ui.control_label('מקור פליטה'),
-            dmc.ChipGroup(dmc.Group(heatmap.source_chips(sources, SOURCE_LABELS), gap=8, className='chip-scroller'),
+            dmc.ChipGroup(dmc.Group(heatmap.source_chips(sources, SOURCE_LABELS, SOURCE_ICONS), gap=8, className='chip-scroller'),
                           id=CO2_SOURCES_ID, value=select_source, multiple=False, deselectable=False),
         ]),
     ], gap='md')
@@ -195,7 +205,7 @@ def register_callbacks(app):
         else:
             options = sources
             value = current_source
-        return dmc.Group(heatmap.source_chips(options, SOURCE_LABELS), gap=8, className='chip-scroller'), value
+        return dmc.Group(heatmap.source_chips(options, SOURCE_LABELS, SOURCE_ICONS), gap=8, className='chip-scroller'), value
 
     @app.callback(
         Output(CO2_HEATMAP_ID, 'figure'),
@@ -303,12 +313,14 @@ def register_callbacks(app):
                     ),
                     row=1, col=1)
         else:
+            line_color = ui.COLOR_RENEWABLE if source == SOURCE_RENEWABLES else ui.COLOR_LINE
             fig.add_trace(
                 go.Scatter(
                     x=dfs_heatmap.columns.values,
                     y=scatter_y,
                     customdata=scatter_customdata,
-                    line=dict(color=ui.COLOR_RENEWABLE if source == SOURCE_RENEWABLES else ui.COLOR_LINE),
+                    line=dict(color=line_color),
+                    **ui.area_fill(line_color),
                     hovertemplate=scatter_hover
                 ),
                 row=1, col=1)
@@ -338,8 +350,13 @@ def register_callbacks(app):
             ticktext=['00:00', '06:00', '12:00', '18:00', '24:00'],
             row=2, col=1)
         fig.update_xaxes(showline=False)
+        # White grid on the tinted daily graph
+        fig.update_xaxes(gridcolor='white', row=1, col=1)
+        fig.update_yaxes(gridcolor='white', row=1, col=1)
         fig.update_layout(
             height=760,
+            # Only visible in the daily graph: the heatmap covers its whole plot area
+            plot_bgcolor=ui.PLOT_TINT,
             showlegend=source == SOURCE_TOTAL,
             legend={"orientation": "h", "x": 0, "y": 1.06},
             margin={"t": 32, "r": 16},

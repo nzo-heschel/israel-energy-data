@@ -15,6 +15,8 @@ TEXT_SECONDARY = "#495057"
 TEXT_MUTED = "#868e96"
 GRID = "#eef0f2"
 AXIS_LINE = "#dee2e6"
+# Faint warm tint behind the daily graphs above the heatmaps
+PLOT_TINT = "#f3f0e8"
 
 # Semantic series colors
 COLOR_RENEWABLE = "#1baf7a"
@@ -40,6 +42,7 @@ MANTINE_THEME = {
     },
 }
 
+# No Plotly toolbar anywhere; charts that allow zooming do so by dragging, and double-click resets
 GRAPH_CONFIG = {"displayModeBar": False, "responsive": True}
 
 pio.templates["energy"] = go.layout.Template(
@@ -57,7 +60,6 @@ pio.templates["energy"] = go.layout.Template(
                    radialaxis=dict(gridcolor=AXIS_LINE, linecolor=AXIS_LINE),
                    angularaxis=dict(gridcolor=AXIS_LINE, linecolor=AXIS_LINE)),
         legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(size=12, color=TEXT_SECONDARY)),
-        dragmode=False,
     ),
     data=dict(
         heatmap=[go.Heatmap(colorbar=dict(outlinewidth=0, thickness=12, tickfont=dict(size=12)))],
@@ -107,14 +109,21 @@ def chart_card(graph, title=None, subtitle=None, controls=None, footer=None, **c
     ], **card_props)
 
 
-def stat_card(label, value, icon_name=None, color=PRIMARY, hint=None):
+def area_fill(hex_color):
+    """Soft vertical gradient under a line: strongest at the top, fading towards the baseline."""
+    r, g, b = (int(hex_color[i:i + 2], 16) for i in (1, 3, 5))
+    return dict(fill="tozeroy", fillgradient=dict(type="vertical", colorscale=[
+        [0, f"rgba({r}, {g}, {b}, 0.02)"], [1, f"rgba({r}, {g}, {b}, 0.28)"]]))
+
+
+def stat_card(label, value, icon_name=None, color=PRIMARY, hint=None, center_value=False):
     return dmc.Card([
         dmc.Group([
             dmc.Stack([
                 dmc.Text(label, c="dimmed", size="xs", tt="uppercase", fw=600),
-                dmc.Text(value, fw=800, size="xl", className="stat-value"),
+                dmc.Text(value, fw=800, size="xl", className="stat-value", ta="center" if center_value else None),
                 dmc.Text(hint, c="dimmed", size="xs") if hint else None,
-            ], gap=4),
+            ], gap=4, style={"flex": 1} if center_value else None),
             dmc.ThemeIcon(icon(icon_name, 20), size=42, radius="md", variant="light", color=color)
             if icon_name else None,
         ], justify="space-between", align="flex-start", wrap="nowrap"),

@@ -3,7 +3,7 @@ import logging
 import threading
 import time
 from flask import request, Response
-from dash import Dash, dcc, html, ctx, Input, Output, State
+from dash import Dash, dcc, html, Input, Output
 import dash_mantine_components as dmc
 from pages import home, bar_chart, heatmap, storage, co2, ui
 
@@ -107,38 +107,46 @@ NAV_ITEMS = [
     (PATH_CO2, 'פליטות', 'cloud'),
 ]
 
-BURGER_ID = 'nav-burger'
-APP_SHELL_ID = 'app-shell'
+def _nav_links():
+    return dmc.Group([
+        dmc.NavLink(label=label, href=href, active='exact', leftSection=ui.icon(icon_name, 16),
+                    className='nav-link', variant='light', w='auto', noWrap=True)
+        for href, label, icon_name in NAV_ITEMS
+    ], gap=4, wrap='nowrap', visibleFrom='md')
 
 
-def _navbar():
-    return dmc.AppShellNavbar([
-        dmc.Text('ניווט', size='xs', fw=700, c='dimmed', mb='xs', px='sm'),
-        *[dmc.NavLink(label=label, href=href, active='exact', leftSection=ui.icon(icon_name),
-                      className='nav-link', variant='light')
-          for href, label, icon_name in NAV_ITEMS],
-        dmc.Box(style={'flex': 1}),
-        dmc.Divider(my='sm'),
-        dmc.Group([
-            ui.icon('bolt', 14),
-            dmc.Text('מקור הנתונים: נוגה – ניהול מערכת החשמל', size='xs', c='dimmed'),
-        ], gap=6, px='sm', c='dimmed', wrap='nowrap'),
-    ], p='md', style={'display': 'flex', 'flexDirection': 'column'})
+def _nav_menu():
+    # Below the md breakpoint the links don't fit in the header, so they collapse into a menu
+    return dmc.Box(dmc.Menu([
+        dmc.MenuTarget(dmc.ActionIcon(ui.icon('menu', 20), variant='subtle', color='gray', size='lg',
+                                      **{'aria-label': 'ניווט'})),
+        dmc.MenuDropdown([
+            dmc.MenuItem(label, href=href, leftSection=ui.icon(icon_name, 16))
+            for href, label, icon_name in NAV_ITEMS
+        ]),
+    ], position='bottom-end', width=220, shadow='md'), hiddenFrom='md')
 
 
 def _header():
     return dmc.AppShellHeader(
         dmc.Group([
             dmc.Group([
-                dmc.Burger(id=BURGER_ID, size='sm', hiddenFrom='sm', opened=False),
                 dcc.Link(html.Img(src=LOGO_URL, className='brand-logo', alt='Logo'), href='/'),
-                dmc.Divider(orientation='vertical', visibleFrom='xs'),
-                dmc.Text('נתוני חשמל בישראל', fw=700, size='lg', visibleFrom='xs'),
+                dmc.Divider(orientation='vertical', visibleFrom='lg'),
+                dmc.Text('נתוני חשמל בישראל', fw=700, size='lg', visibleFrom='lg'),
             ], gap='md', wrap='nowrap'),
-            dmc.Badge('נתונים פתוחים', variant='light', radius='sm', visibleFrom='sm'),
+            _nav_links(),
+            _nav_menu(),
         ], h='100%', px='lg', justify='space-between', wrap='nowrap'),
         className='app-header',
     )
+
+
+def _footer():
+    return dmc.Group([
+        ui.icon('bolt', 14),
+        dmc.Text('מקור הנתונים: נוגה – ניהול מערכת החשמל', size='xs'),
+    ], gap=6, c='dimmed', justify='center', mt='xl', pb='md')
 
 
 # --- Top-Level Application Layout ---
@@ -149,12 +157,12 @@ def app_layout():
             dmc.AppShell([
                 dcc.Location(id='url', refresh=False),
                 _header(),
-                _navbar(),
-                dmc.AppShellMain(dmc.Container(html.Div(id='page-content'), size='xl', px={'base': 'xs', 'sm': 'md'}, py='md')),
+                dmc.AppShellMain(dmc.Container([
+                    html.Div(id='page-content'),
+                    _footer(),
+                ], size='xl', px={'base': 'xs', 'sm': 'md'}, py='md')),
             ],
-                id=APP_SHELL_ID,
                 header={'height': 64},
-                navbar={'width': 248, 'breakpoint': 'sm', 'collapsed': {'mobile': True}},
                 padding='md',
             ),
             direction='rtl',
@@ -196,19 +204,6 @@ def display_page(pathname):
     else:
         # Default to home page for '/' or any unrecognized path
         return home.home_layout(LOGO_URL)
-
-
-@dash_app.callback(Output(APP_SHELL_ID, 'navbar'),
-                   Output(BURGER_ID, 'opened'),
-                   Input(BURGER_ID, 'opened'),
-                   Input('url', 'pathname'),
-                   State(APP_SHELL_ID, 'navbar'))
-def toggle_navbar(opened, _pathname, navbar):
-    # On mobile the navbar is a drawer: the burger opens it, navigating closes it
-    if ctx.triggered_id == 'url':
-        opened = False
-    navbar['collapsed'] = {'mobile': not opened}
-    return navbar, opened
 
 
 bar_chart.register_callbacks(dash_app)

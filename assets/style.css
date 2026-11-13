@@ -30,10 +30,10 @@ body {
     display: block;
 }
 
-/* Sidebar navigation */
+/* Header navigation */
 .nav-link {
     border-radius: var(--mantine-radius-md);
-    margin-bottom: 4px;
+    padding: 6px 12px;
     font-weight: 500;
 }
 
@@ -89,4 +89,21 @@ body {
 
 .chip-scroller {
     row-gap: 8px;
+}
+
+/* Mantine centres slider mark labels with an LTR-only transform; mirror it so labels sit under their marks */
+[dir="rtl"] .year-slider .mantine-RangeSlider-markLabel {
+    transform: translate(calc(50% - var(--slider-size) / 2), calc(var(--mantine-spacing-xs) / 2));
+}
+
+.chip-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.chip-emoji {
+    font-size: 15px;
+    line-height: 1;
+    font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
 }

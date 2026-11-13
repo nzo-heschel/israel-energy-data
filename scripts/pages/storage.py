@@ -1,4 +1,4 @@
-from dash import dcc, Input, Output, clientside_callback, callback_context
+from dash import dcc, html, Input, Output, clientside_callback, callback_context
 from dash.exceptions import PreventUpdate
 import dash_mantine_components as dmc
 import plotly.graph_objects as go
@@ -30,6 +30,7 @@ VALUE_BATTERIES = 'BatteriesNet'
 VALUE_PSP = 'PspNet'
 
 SOURCE_TITLES = {VALUE_BATTERIES: 'אגירה בסוללות', VALUE_PSP: 'אגירה שאובה'}
+SOURCE_ICONS = {VALUE_BATTERIES: '🔋', VALUE_PSP: '💧'}
 
 COLOR_DISCHARGE = ui.COLOR_DISCHARGE
 COLOR_CHARGE = ui.COLOR_CHARGE
@@ -95,7 +96,9 @@ def storage_layout():
             ui.control_label('סוג אגירה'),
             dmc.SegmentedControl(
                 id=STORAGE_SOURCE_ID,
-                data=[{'label': title, 'value': value} for value, title in SOURCE_TITLES.items()],
+                data=[{'label': html.Span([html.Span(SOURCE_ICONS[value], className='chip-emoji'), title],
+                                          className='chip-label'),
+                       'value': value} for value, title in SOURCE_TITLES.items()],
                 value=last_source,
                 fullWidth=True,
             ),
@@ -109,6 +112,9 @@ def storage_layout():
                 minDate=min_date.isoformat(),
                 maxDate=max_date.isoformat(),
                 valueFormat='DD/MM/YYYY',
+                # Israeli week: Sunday to Saturday, with only Saturday marked as the weekend
+                firstDayOfWeek=0,
+                weekendDays=[6],
                 allowSingleDateInRange=True,
                 dropdownType='modal',
                 # Keep "start – end" in reading order inside the RTL page
@@ -120,7 +126,7 @@ def storage_layout():
                 dmc.Button('שנה אחרונה', id=BTN_YEAR_ID, n_clicks=0, variant='light', size='compact-sm'),
             ], gap=6, mt='xs'),
         ]),
-        dmc.Switch(id=GRAPH_TYPE_ID, label='גרף מלבני (במקום קוטבי)', checked=False),
+        dmc.Switch(id=GRAPH_TYPE_ID, label='גרף מלבני', checked=False),
     ], gap='lg'))
 
     def small_chart(graph_id, title, subtitle):
@@ -436,9 +442,12 @@ def register_callbacks(app):
         efficiency = total_positive_energy / -total_negative_energy if total_negative_energy != 0 else 0
 
         info_children = [
-            ui.stat_card('פריקה מקסימלית', f'{max_power_discharging_total:,.0f} MW', 'arrow-up', color='teal'),
-            ui.stat_card('טעינה מקסימלית', f'{-max_power_charging_total:,.0f} MW', 'arrow-down', color='orange'),
-            ui.stat_card('נצילות', f'{efficiency:.1%}', 'gauge', color='blue', hint='אנרגיה שנפרקה / אנרגיה שנטענה'),
+            ui.stat_card('פריקה מקסימלית', f'{max_power_discharging_total:,.2f} MW', 'arrow-up', color='teal',
+                         center_value=True),
+            ui.stat_card('טעינה מקסימלית', f'{-max_power_charging_total:,.2f} MW', 'arrow-down', color='orange',
+                         center_value=True),
+            ui.stat_card('נצילות', f'{efficiency:.1%}', 'gauge', color='blue', hint='אנרגיה שנפרקה / אנרגיה שנטענה',
+                         center_value=True),
         ]
 
         # Main Figure Layout
@@ -452,6 +461,7 @@ def register_callbacks(app):
             
             ui.axis_unit(fig_main, "MW")
             fig_main.update_layout(
+                dragmode=False,
                 xaxis=dict(
                     tickformat="%H:%M", 
                     fixedrange=True,
@@ -498,6 +508,7 @@ def register_callbacks(app):
             range_vals = [r_min, r_max + (nice_step / 10) if len(all_power_values_flat) > 0 else 1]
 
             fig_main.update_layout(
+                dragmode=False,
                 margin=dict(l=40, r=40, t=32, b=32),
                 polar=dict(
                     radialaxis=dict(
@@ -532,6 +543,7 @@ def register_callbacks(app):
         for fig, unit in [(fig_cum, "MWh"), (fig_daily, "MW"), (fig_daily_energy, "MWh")]:
             ui.axis_unit(fig, unit)
             fig.update_layout(
+                dragmode=False,
                 xaxis=dict(fixedrange=True),
                 yaxis=dict(fixedrange=True, zeroline=True, zerolinecolor=ui.AXIS_LINE, zerolinewidth=1,
                            rangemode='normal' if fig is fig_cum else 'tozero'),

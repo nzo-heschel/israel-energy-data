@@ -1,4 +1,4 @@
-from dash import dcc, Input, Output, State, callback_context
+from dash import dcc, html, Input, Output, State, callback_context
 import dash_mantine_components as dmc
 from dash.exceptions import PreventUpdate
 import plotly.graph_objects as go
@@ -13,6 +13,7 @@ from scripts import server, utils
 from . import ui
 
 HEATMAP_ID = "heatmap-graph"
+HEATMAP_TITLE_ID = "heatmap-title"
 SOURCES_ID = "sources-radioitems"
 FREEZE_SCALE_ID = "freeze-scale"
 DISPLAY_MODE_ID = "display-mode-radioitems"
@@ -25,7 +26,7 @@ COLOR_CHARGE = ui.COLOR_CHARGE
 
 SOURCE_LABELS = {
     "Coal": "פחם",
-    "Gas": "גז טבעי",
+    "Gas": "גז",
     "Diesel": "סולר",
     "Mazut": "מזוט",
     "Other": "אחר",
@@ -34,13 +35,41 @@ SOURCE_LABELS = {
     "Thermo": "תרמו-סולארי",
     "Wind": "רוח",
     "BioGas": "ביוגז",
-    "RenewableSum": 'סה"כ מתחדשות',
+    "RenewableSum": "סך הכל",
     "ActualDemand": "ביקוש בפועל",
     "Psp": "אגירה שאובה",
     "PspNet": "אגירה שאובה (נטו)",
     "BatteriesNet": "סוללות (נטו)",
     "Storage": "אגירה",
 }
+
+SOURCE_ICONS = {
+    "Coal": "🪨",
+    "Gas": "🔥",
+    "Diesel": "⛽",
+    "Mazut": "🛢️",
+    "Other": "⚙️",
+    "Pv": "☀️",
+    "PvWithStorage": "☀️🔋",
+    "Thermo": "🔆",
+    "Wind": "🌬️",
+    "BioGas": "🌱",
+    "RenewableSum": "♻️",
+    "ActualDemand": "⚡",
+    "Psp": "💧",
+    "PspNet": "💧",
+    "BatteriesNet": "🔋",
+    "Storage": "💧🔋",
+}
+
+GENERAL_GROUP = "general"
+# (key, title, icon, members). Sources not listed in any group fall into the general group.
+SOURCE_GROUPS = [
+    ("fossil", "דלקים פוסיליים", "flame", ["Gas", "Coal", "Diesel", "Mazut"]),
+    ("renewables", "אנרגיות מתחדשות", "leaf", ["Pv", "PvWithStorage", "Wind", "Thermo", "BioGas", "Other", "RenewableSum"]),
+    ("storage", "אגירה", "battery", ["Psp", "PspNet", "BatteriesNet", "Storage"]),
+    (GENERAL_GROUP, "כללי", "bolt", ["ActualDemand"]),
+]
 
 DISPLAY_MODES = [
     {"label": "ערכים מוחלטים", "value": MODE_ABSOLUTE},
@@ -134,27 +163,57 @@ def _data_yrange(*scatter_series_list):
     return [ymin - pad, ymax + pad]
 
 
-def source_chips(source_names, labels=SOURCE_LABELS):
-    return [dmc.Chip(labels.get(name, name), value=name) for name in source_names]
+def source_chips(source_names, labels=SOURCE_LABELS, icons=SOURCE_ICONS):
+    def chip_label(name):
+        if not icons or name not in icons:
+            return labels.get(name, name)
+        return html.Span([html.Span(icons[name], className='chip-emoji'), labels.get(name, name)], className='chip-label')
+    return [dmc.Chip(chip_label(name), value=name) for name in source_names]
+
+
+def grouped_source_chips(source_names):
+    """Chips laid out in titled rows by source group; empty groups are omitted."""
+    grouped = {key: [] for key, *_ in SOURCE_GROUPS}
+    member_group = {name: key for key, _, _, members in SOURCE_GROUPS for name in members}
+    for name in source_names:
+        grouped[member_group.get(name, GENERAL_GROUP)].append(name)
+
+    cards = []
+    for key, title, icon_name, members in SOURCE_GROUPS:
+        # Listed members first in their defined order, then any unlisted sources
+        names = [n for n in members if n in grouped[key]] + [n for n in grouped[key] if n not in members]
+        if not names:
+            continue
+        cards.append(dmc.Card([
+            dmc.Group([
+                dmc.ThemeIcon(ui.icon(icon_name, 16), size=30, radius='md', variant='light'),
+                dmc.Text(title, fw=700, size='sm'),
+            ], gap=8, mb='sm', wrap='nowrap'),
+            dmc.Group(source_chips(names), gap=8, className='chip-scroller'),
+        ], padding='md',
+            # Cards share a row, growing in proportion to how many sources they hold
+            style={'flex': f'{len(names)} 1 260px'}))
+    return dmc.Flex(cards, gap='md', wrap='wrap', align='stretch')
+
+
+def chart_title(source):
+    return html.Span(['תמהיל הייצור – ', html.Span(SOURCE_ICONS.get(source, ''), className='chip-emoji'), ' ',
+                      SOURCE_LABELS.get(source, source)])
 
 
 def heatmap_layout():
-    controls = dmc.Stack([
-        dmc.Group([
-            dmc.SegmentedControl(id=DISPLAY_MODE_ID, data=DISPLAY_MODES, value=MODE_ABSOLUTE),
-            dmc.Switch(id=FREEZE_SCALE_ID, label='הקפאת סקאלה', checked=False),
-        ], justify='space-between', wrap='wrap'),
-        dmc.Box([
-            ui.control_label('מקור ייצור'),
-            dmc.ChipGroup(dmc.Group(source_chips(sources), gap=8, className='chip-scroller'),
-                          id=SOURCES_ID, value=select_source, multiple=False, deselectable=False),
-        ]),
-    ], gap='md')
+    controls = dmc.Group([
+        dmc.SegmentedControl(id=DISPLAY_MODE_ID, data=DISPLAY_MODES, value=MODE_ABSOLUTE),
+        dmc.Switch(id=FREEZE_SCALE_ID, label='הקפאת סקאלה', checked=False),
+    ], justify='space-between', wrap='wrap')
 
     return dmc.Stack([
-        ui.page_header('תמהיל הייצור', 'הספק לפי שעה ביום (ציר אנכי) ולאורך זמן (ציר אופקי). הגרף העליון מציג את האנרגיה היומית.', 'layers'),
-        dmc.Card(controls),
-        ui.chart_card(dcc.Graph(id=HEATMAP_ID, config=ui.GRAPH_CONFIG)),
+        ui.page_header('תמהיל הייצור', 'הספק לפי שעה ביום (ציר אנכי) ולאורך זמן (ציר אופקי). הגרף העליון מציג את האנרגיה היומית.', 'layers',
+                       right=controls),
+        dmc.ChipGroup(grouped_source_chips(sources),
+                      id=SOURCES_ID, value=select_source, multiple=False, deselectable=False),
+        ui.chart_card(dcc.Graph(id=HEATMAP_ID, config=ui.GRAPH_CONFIG),
+                      title=dmc.Text(chart_title(select_source), id=HEATMAP_TITLE_ID, fw=700, size='lg')),
     ], gap='md')
 
 
@@ -172,7 +231,14 @@ def register_callbacks(app):
         else:
             options = sources
             value = current_source
-        return dmc.Group(source_chips(options), gap=8, className='chip-scroller'), value
+        return grouped_source_chips(options), value
+
+    @app.callback(
+        Output(HEATMAP_TITLE_ID, 'children'),
+        Input(SOURCES_ID, 'value'),
+    )
+    def update_heatmap_title(source):
+        return chart_title(source)
 
     @app.callback(
         Output(HEATMAP_ID, 'figure'),
@@ -272,6 +338,7 @@ def register_callbacks(app):
                     y=scatter_pos_y,
                     name='Discharge',
                     line=dict(color=COLOR_DISCHARGE),
+                    **ui.area_fill(COLOR_DISCHARGE),
                     hovertemplate=scatter_hover
                 ),
                 row=1, col=1)
@@ -281,6 +348,7 @@ def register_callbacks(app):
                     y=scatter_neg_y,
                     name='Charge',
                     line=dict(color=COLOR_CHARGE),
+                    **ui.area_fill(COLOR_CHARGE),
                     hovertemplate=scatter_hover
                 ),
                 row=1, col=1)
@@ -290,8 +358,7 @@ def register_callbacks(app):
                     x=dfs_heatmap.columns.values,
                     y=scatter_y,
                     line=dict(color=ui.COLOR_LINE),
-                    fill='tozeroy',
-                    fillcolor='rgba(42, 120, 214, 0.08)',
+                    **ui.area_fill(ui.COLOR_LINE),
                     hovertemplate=scatter_hover
                 ),
                 row=1, col=1)
@@ -325,8 +392,13 @@ def register_callbacks(app):
             ticktext=['00:00', '06:00', '12:00', '18:00', '24:00'],
             row=2, col=1)
         fig.update_xaxes(showline=False)
+        # White grid on the tinted daily graph
+        fig.update_xaxes(gridcolor='white', row=1, col=1)
+        fig.update_yaxes(gridcolor='white', row=1, col=1)
         fig.update_layout(
             height=760,
+            # Only visible in the daily graph: the heatmap covers its whole plot area
+            plot_bgcolor=ui.PLOT_TINT,
             showlegend=show_pos_neg,
             legend={"orientation": "h", "x": 0, "y": 1.06},
             margin={"t": 32, "r": 16},
