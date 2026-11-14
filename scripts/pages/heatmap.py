@@ -208,7 +208,7 @@ def heatmap_layout():
     ], justify='space-between', wrap='wrap')
 
     return dmc.Stack([
-        ui.page_header('תמהיל הייצור', 'הספק לפי שעה ביום (ציר אנכי) ולאורך זמן (ציר אופקי). הגרף העליון מציג את האנרגיה היומית.', 'layers',
+        ui.page_header('תמהיל הייצור', 'הספק שעתי וייצור יומי לפי מקור', 'layers',
                        right=controls),
         dmc.ChipGroup(grouped_source_chips(sources),
                       id=SOURCES_ID, value=select_source, multiple=False, deselectable=False),

@@ -185,7 +185,7 @@ def co2_layout():
     ], gap='md')
 
     return dmc.Stack([
-        ui.page_header('פליטות CO2', 'פליטות לפי שעה ביום ולאורך זמן, לפי סוג דלק. הגרף העליון מציג את הסכום היומי.', 'cloud'),
+        ui.page_header('פליטות CO2', 'פליטות לפי שעה ביום ולאורך זמן, לפי סוג דלק', 'cloud'),
         dmc.Card(controls),
         ui.chart_card(dcc.Graph(id=CO2_HEATMAP_ID, config=ui.GRAPH_CONFIG)),
     ], gap='md')

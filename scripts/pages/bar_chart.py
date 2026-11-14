@@ -16,6 +16,7 @@ YEARLY_SWITCH_ID = "yearly-switch"
 TOTAL_SWITCH_ID = "total-switch"
 PERCENT_SWITCH_ID = "percent-switch"
 PERCENT_WRAPPER_ID = "percent-switch-wrapper"
+CHART_TITLE_ID = "bar-chart-title"
 CONTROL_COLOR = "indigo"
 YEAR_FROM: int = 2021
 YEAR_TO: int = 2060  # excluding
@@ -172,10 +173,10 @@ def bar_chart_layout():
     ], gap='xl', align='center', wrap='wrap')
 
     return dmc.Stack([
-        ui.page_header('ייצור חשמל בישראל', 'ייצור חודשי לפי שנה – מתחדשות מול סך הייצור.', 'sun'),
+        ui.page_header('ייצור חשמל בישראל', 'מתחדשות מול סך הייצור', 'sun'),
         dmc.Card(controls),
         ui.chart_card(dcc.Graph(id=MAIN_GRAPH_ID, config=ui.GRAPH_CONFIG),
-                      title='ייצור חודשי'),
+                      title=dmc.Text('ייצור חודשי', id=CHART_TITLE_ID, fw=700, size='lg', span=True)),
     ], gap='md')
 
 
@@ -324,3 +325,10 @@ def register_callbacks(app):
     )
     def toggle_percent_switch(show_total):
         return {'display': 'none' if show_total else 'block'}
+
+    @app.callback(
+        Output(CHART_TITLE_ID, 'children'),
+        Input(YEARLY_SWITCH_ID, 'checked'),
+    )
+    def update_chart_title(yearly):
+        return 'ייצור שנתי' if yearly else 'ייצור חודשי'
