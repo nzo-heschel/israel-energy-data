@@ -177,6 +177,7 @@ def _load_initial_data():
     time.sleep(1)
     logging.info("Loading initial chart data in background")
     heatmap.retrieve_data()
+    co2.retrieve_data()
     bar_chart.retrieve_data()
     data_ready = True
     logging.info("Initial chart data loaded; server is ready")

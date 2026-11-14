@@ -173,8 +173,7 @@ def _data_yrange(*scatter_series_list):
 
 
 def co2_layout():
-    if not sources:
-        retrieve_data()
+    # Data is loaded at startup (charts._load_initial_data) and refreshed hourly by the figure callback
     controls = dmc.Stack([
         dmc.SegmentedControl(id=CO2_DISPLAY_MODE_ID, data=DISPLAY_MODES, value=MODE_ABSOLUTE, w='fit-content'),
         dmc.Box([
