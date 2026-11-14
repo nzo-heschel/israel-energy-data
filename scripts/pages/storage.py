@@ -134,7 +134,7 @@ def storage_layout():
                              title=title, subtitle=subtitle)
 
     return dmc.Stack([
-        ui.page_header('אגירת אנרגיה', 'פרופיל יומי של טעינה (שלילי) ופריקה (חיובי). ריחוף מעל יום מדגיש אותו.', 'battery'),
+        ui.page_header('אגירת אנרגיה', 'פרופיל יומי של טעינה (שלילי) ופריקה (חיובי).', 'battery'),
         dcc.Store(id=STORAGE_STORE_ID),
         dmc.Grid([
             dmc.GridCol(dmc.Stack([
@@ -149,7 +149,7 @@ def storage_layout():
                     clear_on_unhover=True
                 ),
                 title=dmc.Text(id=STORAGE_TITLE_ID, fw=700, size='lg', span=True),
-                subtitle='הספק (MW) לפי שעה ביום – כל קו/נקודה מייצגים יום אחד',
+                subtitle='הספק (MW) לפי שעה ביום',
             ), span={'base': 12, 'md': 8, 'lg': 9}),
         ], gutter='md'),
         small_chart(CUMULATIVE_ID, 'אנרגיה מצטברת', 'MWh · סכום מצטבר של טעינה ופריקה לאורך הטווח'),
@@ -454,11 +454,11 @@ def register_callbacks(app):
 
         info_children = [
             ui.stat_card('פריקה מקסימלית', f'{max_power_discharging_total:,.2f} MW', 'arrow-up', color='teal',
-                         center_value=True),
+                         center_value=True, value_size=28),
             ui.stat_card('טעינה מקסימלית', f'{-max_power_charging_total:,.2f} MW', 'arrow-down', color='orange',
-                         center_value=True),
+                         center_value=True, value_size=28),
             ui.stat_card('נצילות', f'{efficiency:.1%}', 'gauge', color='blue', hint='אנרגיה שנפרקה / אנרגיה שנטענה',
-                         center_value=True),
+                         center_value=True, value_size=28),
         ]
 
         # Main Figure Layout

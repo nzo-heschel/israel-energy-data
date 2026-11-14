@@ -154,24 +154,28 @@ def bar_chart_layout():
                 min=-last_max_year, max=-YEAR_FROM, step=1, minRange=0,
                 value=[-last_max_year, -YEAR_FROM],
                 marks=[{'value': -yr, 'label': str(yr)} for yr in range(YEAR_FROM, last_max_year + 1)],
-                restrictToMarks=True,
+                # step=1 already snaps to whole years; restrictToMarks would stop both thumbs sharing a year
                 label=None,
                 color=CONTROL_COLOR,
                 mb='lg',
             ),
         ], w={'base': '100%', 'sm': 420}, className='year-slider'),
-        dmc.Switch(id=YEARLY_SWITCH_ID, label='תצוגה שנתית/חודשית', checked=False, size='md', color=CONTROL_COLOR),
-        dmc.Switch(id=TOTAL_SWITCH_ID, label='מתחדשות/סך הכל', checked=True, size='md', color=CONTROL_COLOR),
+        # Both sides of each switch are equal choices, so the track keeps one colour in either state
+        dmc.Switch(id=YEARLY_SWITCH_ID, label='תצוגה שנתית/חודשית', checked=False, size='md', color=CONTROL_COLOR,
+                   className='choice-switch'),
+        dmc.Switch(id=TOTAL_SWITCH_ID, label='מתחדשות/סך הכל', checked=True, size='md', color=CONTROL_COLOR,
+                   className='choice-switch'),
         # Percentages only make sense for renewables on their own, so this appears when totals are hidden
-        html.Div(dmc.Switch(id=PERCENT_SWITCH_ID, label='ערכים/אחוזים', checked=False, size='md', color=CONTROL_COLOR),
+        html.Div(dmc.Switch(id=PERCENT_SWITCH_ID, label='אנרגיה/אחוזים', checked=False, size='md', color=CONTROL_COLOR,
+                            className='choice-switch'),
                  id=PERCENT_WRAPPER_ID, style={'display': 'none'}),
     ], gap='xl', align='center', wrap='wrap')
 
     return dmc.Stack([
-        ui.page_header('ייצור חשמל בישראל', 'ייצור חודשי לפי שנה – מתחדשות מול סך הייצור. האחוז מעל כל עמודה הוא חלק המתחדשות.', 'sun'),
+        ui.page_header('ייצור חשמל בישראל', 'ייצור חודשי לפי שנה – מתחדשות מול סך הייצור.', 'sun'),
         dmc.Card(controls),
         ui.chart_card(dcc.Graph(id=MAIN_GRAPH_ID, config=ui.GRAPH_CONFIG),
-                      title='ייצור חודשי', subtitle='GWh · מקור: נוגה'),
+                      title='ייצור חודשי'),
     ], gap='md')
 
 
@@ -187,10 +191,16 @@ def bar_chart(cost_data_all: Dict, max_year: int, years_range: List[int], yearly
         y = int(date_str.split('-')[2])
         data_by_year[y][date_str] = data
 
+    # Yearly view: fewer bars leave more room, so the labels grow as the year range shrinks
+    n_years = end_year - start_year + 1
+    label_size = max(16, 30 - 2 * (n_years - 1))
+    tick_size = max(12, 22 - 2 * (n_years - 1)) if yearly else None
+
     # Only iterate the years we actually need to display
     for yr in range(start_year, end_year + 1):
         year_data = data_by_year.get(yr, {})
         trace_ren, trace_conv, total, total_ren = per_year_stacked_bar(year_data, yr, yearly=yearly,
+                                                                       label_size=label_size,
                                                                        show_total=show_total, percent=percent)
         
         if show_total:
@@ -203,7 +213,7 @@ def bar_chart(cost_data_all: Dict, max_year: int, years_range: List[int], yearly
                         height=640,
                         bargap=0.18,
                         bargroupgap=0.06,
-                        xaxis=go.layout.XAxis(title="", fixedrange=True, showline=False,
+                        xaxis=go.layout.XAxis(title="", fixedrange=True, showline=False, tickfont={"size": tick_size},
                                               type="category" if yearly else None),
                         yaxis=go.layout.YAxis(fixedrange=True,
                                               tickformat=",.0f", rangemode="tozero"),
@@ -219,7 +229,8 @@ def bar_chart(cost_data_all: Dict, max_year: int, years_range: List[int], yearly
     ui.axis_unit(fig, "%" if percent else "GWh")
     return fig
 
-def per_year_stacked_bar(cost_data: Dict, group: int, yearly: bool = False, show_total: bool = True,
+def per_year_stacked_bar(cost_data: Dict, group: int, yearly: bool = False, label_size: int = 18,
+                         show_total: bool = True,
                          percent: bool = False):
     total = 0
     total_renewable = 0
@@ -259,12 +270,14 @@ def per_year_stacked_bar(cost_data: Dict, group: int, yearly: bool = False, show
     hover_title = '<b>%{x}</b>' if yearly else f'<b>%{{x}} {group}</b>'
     hover = (hover_title
              + '<br><span style="color:black">' + rtl('סך הכל:', '%{customdata[1]:,.0f} GWh') + '</span>'
-             + f'<br><span style="color:{bar_4[2]["ren"]}">' + rtl('מתחדשות:', '%{customdata[0]:,.0f} GWh (%{customdata[2]})')
+             + f'<br><span style="color:{bar_4[2]["ren"]}">' + rtl('מתחדשות:', '%{customdata[0]:,.0f} GWh / %{customdata[2]}')
              + '</span><extra></extra>')
-    # The renewable share is labelled above the full stack, or above the renewables when totals are hidden
+    # The renewable share is labelled above the full stack (monthly) or inside the totals segment just above the
+    # renewables (yearly); when totals are hidden it goes above the renewables bar
     label = dict(text=y_text_vals, textposition="outside", cliponaxis=False,
                  textangle=0 if yearly else -90,
-                 textfont={"size": 18 if yearly else 11, "color": ui.TEXT_PRIMARY if yearly else ui.TEXT_SECONDARY})
+                 textfont={"size": label_size if yearly else 11, "color": ui.TEXT_PRIMARY if yearly else ui.TEXT_SECONDARY})
+    total_label = (dict(label, textposition="inside", insidetextanchor="start") if yearly else label)
 
     # Percent view: renewables as a share of each month's/year's total (only shown without the totals)
     y_ren_plot = ([ren / (ren + conv) * 100 if ren + conv else 0 for ren, conv in zip(y_ren_vals, y_conv_vals)]
@@ -286,7 +299,7 @@ def per_year_stacked_bar(cost_data: Dict, group: int, yearly: bool = False, show
                         legendgrouptitle={"text": "סך הכל", "font": {"size": 13}},
                         customdata=customdata,
                         hovertemplate=hover,
-                        **label)
+                        **total_label)
     return trace_ren, trace_conv, total, total_renewable
 
 

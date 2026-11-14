@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime
+import pandas as pd
 from dash import dcc, html
 import dash_mantine_components as dmc
 
@@ -17,30 +18,56 @@ FEATURES = [
 ]
 
 
+def _peak(df, cols):
+    """Highest reading in the given day columns, as (value, timestamp)."""
+    day = df[cols].max().idxmax()
+    time = df[day].idxmax()
+    return df.at[time, day], day.strftime('%d/%m/%Y') + ' · ' + time
+
+
+# Home page KPIs use a larger number than the default stat card
+VALUE_SIZE = 28
+
+
+def _format_mw(value):
+    return f'{value:,.0f} MW' if value >= 100 else f'{value:,.1f} MW'
+
+
 def _kpis():
-    """Headline numbers from the latest loaded day. Returns None if data isn't available yet."""
+    """Headline numbers from the loaded data, as (renewables cards, peak cards). None if data isn't available yet."""
     dfs = heatmap.dfs
-    if "ActualDemand" not in dfs or "RenewableSum" not in dfs:
+    if any(s not in dfs for s in ('ActualDemand', 'RenewableSum', 'Pv', 'BatteriesNet', 'PvWithStorage')):
         return None
     try:
         demand = dfs["ActualDemand"]
         renewables = dfs["RenewableSum"]
-        # Today's column is still filling up during the day, so report the last complete day
+        # Today's column is still filling up during the day, so count up to the last complete day
         today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
         last_day = demand.columns[demand.columns < today].max()
-        day_demand = demand[last_day]
-        day_share = renewables[last_day].sum() / day_demand.sum()
 
-        year_cols = [c for c in demand.columns if c.year == last_day.year]
-        year_share = renewables[year_cols].sum().sum() / demand[year_cols].sum().sum()
-        return [
-            ui.stat_card('מתחדשות – היום האחרון', f'{day_share:.1%}', 'sun', hint=last_day.strftime('%d/%m/%Y')),
-            ui.stat_card(f'מתחדשות – {last_day.year}', f'{year_share:.1%}', 'leaf', hint='מתחילת השנה'),
-            ui.stat_card('שיא ביקוש יומי', f'{day_demand.max():,.0f} MW', 'gauge', color='blue',
-                         hint=f'בשעה {day_demand.idxmax()}'),
-            ui.stat_card('צריכה יומית', f'{day_demand.sum() / 12 / 1000:,.1f} GWh', 'bolt', color='orange',
-                         hint=last_day.strftime('%d/%m/%Y')),
+        def share(cols):
+            return renewables[cols].sum().sum() / demand[cols].sum().sum()
+
+        year_cols = demand.columns[(demand.columns.year == last_day.year) & (demand.columns <= last_day)]
+        past_12m_cols = demand.columns[(demand.columns > last_day - pd.DateOffset(years=1)) & (demand.columns <= last_day)]
+        renewable_cards = [
+            ui.stat_card('מתחדשות – מתחילת השנה', f'{share(year_cols):.1%}', 'leaf',
+                         hint=f'עד {last_day:%d/%m/%Y}', value_size=VALUE_SIZE),
+            ui.stat_card('מתחדשות – 12 חודשים', f'{share(past_12m_cols):.1%}', 'leaf',
+                         hint=f'עד {last_day:%d/%m/%Y}', value_size=VALUE_SIZE),
         ]
+
+        peak_cards = []
+        for source, label, icon_name, color in [
+            ('ActualDemand', 'שיא ביקוש – 12 חודשים', 'gauge', 'red'),
+            ('Pv', 'שיא ייצור סולארי – 12 חודשים', 'sun', 'yellow'),
+            ('BatteriesNet', 'שיא פריקת סוללות – 12 חודשים', 'battery', 'teal'),
+            ('PvWithStorage', 'שיא PV משולב אגירה – 12 חודשים', 'sun', 'lime'),
+        ]:
+            value, when = _peak(dfs[source], past_12m_cols)
+            peak_cards.append(ui.stat_card(label, _format_mw(value), icon_name, color=color, hint=when,
+                                           value_size=VALUE_SIZE))
+        return renewable_cards, peak_cards
     except (KeyError, ValueError, ZeroDivisionError, AttributeError) as e:
         logging.warning(f"Could not compute home KPIs: {e}")
         return None
@@ -63,20 +90,24 @@ def _feature_card(href, icon_name, title, description):
 
 def home_layout(LOGO_URL):
     kpis = _kpis()
+    renewable_cards, peak_cards = kpis if kpis else ([], [])
     return dmc.Stack([
         dmc.Paper(
             dmc.Group([
                 dmc.Stack([
-                    dmc.Badge('NOGA · נתונים פתוחים', variant='light', size='lg', radius='sm'),
-                    dmc.Title('משק החשמל בישראל, בנתונים', order=1, fw=800, style={'fontSize': 'clamp(28px, 4vw, 42px)'}),
-                    dmc.Text('ייצור, ביקוש, אגירה ופליטות – מתעדכן אוטומטית מנתוני נוגה, ניהול מערכת החשמל.',
-                             c='dimmed', size='lg', maw=560),
-                ], gap='sm'),
-                html.Img(src=LOGO_URL, className='hero-logo', alt='Logo'),
-            ], justify='space-between', align='center', wrap='wrap', gap='xl'),
+                    dmc.Badge('הנגשת מידע לציבור - NZO', leftSection=ui.icon('chart', 14), variant='light', size='lg',
+                              radius='sm'),
+                    dmc.Title('אתר הנגשת הנתונים של NZO למשק החשמל והאנרגיה בישראל', order=1, fw=800,
+                              style={'fontSize': 'clamp(26px, 3vw, 34px)'}, maw=620),
+                ], gap='sm', style={'flex': '1 1 360px'}),
+                dmc.Group([html.Div(card, className='hero-stat') for card in renewable_cards], gap='md'),
+                # Last in the RTL row, so the logo sits on the left
+                dmc.Paper(html.Img(src=LOGO_URL, className='hero-logo', alt='NZO'),
+                          className='hero-logo-box', radius='lg', shadow='sm', withBorder=True),
+            ], justify='space-between', align='center', gap='xl'),
             className='hero', p={'base': 'lg', 'sm': 40}, radius='lg', withBorder=True,
         ),
-        dmc.SimpleGrid(kpis, cols={'base': 1, 'xs': 2, 'md': 4}, spacing='md') if kpis else None,
+        dmc.SimpleGrid(peak_cards, cols={'base': 1, 'xs': 2, 'md': 4}, spacing='md') if peak_cards else None,
         dmc.Title('גרפים', order=3, mt='sm'),
         dmc.SimpleGrid([_feature_card(*f) for f in FEATURES], cols={'base': 1, 'sm': 2, 'lg': 4}, spacing='md'),
     ], gap='lg')

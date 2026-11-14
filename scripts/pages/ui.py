@@ -116,12 +116,12 @@ def area_fill(hex_color):
         [0, f"rgba({r}, {g}, {b}, 0.02)"], [1, f"rgba({r}, {g}, {b}, 0.28)"]]))
 
 
-def stat_card(label, value, icon_name=None, color=PRIMARY, hint=None, center_value=False):
+def stat_card(label, value, icon_name=None, color=PRIMARY, hint=None, center_value=False, value_size="xl"):
     return dmc.Card([
         dmc.Group([
             dmc.Stack([
                 dmc.Text(label, c="dimmed", size="xs", tt="uppercase", fw=600),
-                dmc.Text(value, fw=800, size="xl", className="stat-value", ta="center" if center_value else None),
+                dmc.Text(value, fw=800, fz=value_size, className="stat-value", ta="center" if center_value else None),
                 dmc.Text(hint, c="dimmed", size="xs") if hint else None,
             ], gap=4, style={"flex": 1} if center_value else None),
             dmc.ThemeIcon(icon(icon_name, 20), size=42, radius="md", variant="light", color=color)

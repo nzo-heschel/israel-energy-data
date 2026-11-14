@@ -49,9 +49,27 @@ body {
         linear-gradient(135deg, #ffffff 0%, #f1fbf7 100%);
 }
 
+.hero-logo-box {
+    flex-shrink: 0;
+    width: 160px;
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: #ffffff;
+}
+
 .hero-logo {
-    height: 72px;
-    width: auto;
+    width: 100%;
+    height: auto;
+}
+
+@media (max-width: 600px) {
+    .hero-logo-box {
+        width: 96px;
+        padding: 12px;
+    }
 }
 
 .feature-card {
@@ -80,6 +98,12 @@ body {
     font-variant-numeric: tabular-nums;
     direction: ltr;
     unicode-bidi: isolate;
+    /* LTR keeps "MW"/"%" after the number, but the value still lines up with the RTL label */
+    text-align: right;
+}
+
+.hero-stat {
+    width: 240px;
 }
 
 /* Charts: Plotly draws LTR internally even inside an RTL page */
@@ -106,4 +130,10 @@ body {
     font-size: 15px;
     line-height: 1;
     font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+}
+
+/* Switches that pick between two equal views: same track colour whether on or off */
+.choice-switch .mantine-Switch-track {
+    background-color: var(--switch-color);
+    border-color: var(--switch-color);
 }
