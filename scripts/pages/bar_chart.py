@@ -1,4 +1,5 @@
 from dash import dcc, html, Input, Output
+import dash_mantine_components as dmc
 import plotly.graph_objects as go
 from datetime import datetime
 import calendar
@@ -7,12 +8,16 @@ from collections import defaultdict
 from typing import Dict, List, Tuple, Optional, Any
 
 from scripts import utils, noga
-from . import heatmap
+from . import heatmap, ui
 
 MAIN_GRAPH_ID = "main-graph"
 YEAR_RANGE_SLIDER = "year-range-slider"
-YEARLY_CHECKBOX_ID = "yearly-checkbox"
-YEARLY_VALUE = "Yearly"
+YEARLY_SWITCH_ID = "yearly-switch"
+TOTAL_SWITCH_ID = "total-switch"
+PERCENT_SWITCH_ID = "percent-switch"
+PERCENT_WRAPPER_ID = "percent-switch-wrapper"
+CHART_TITLE_ID = "bar-chart-title"
+CONTROL_COLOR = "indigo"
 YEAR_FROM: int = 2021
 YEAR_TO: int = 2060  # excluding
 
@@ -28,11 +33,12 @@ cached_year_data = None
 last_call = datetime.fromtimestamp(0)  # epoch
 last_max_year = 2050
 
+# Alternating shades so adjacent years are distinguishable: green family for renewables, grays for the rest
 bar_4 = (
-    {"conv": "#667788", "ren": "#00a060"},
-    {"conv": "#a9a9a9", "ren": "#30d030"},
-    {"conv": "#778899", "ren": "#00a020"},
-    {"conv": "#808080", "ren": "#008000"},
+    {"conv": "#adb5bd", "ren": "#1baf7a"},
+    {"conv": "#ced4da", "ren": "#63d6a8"},
+    {"conv": "#868e96", "ren": "#0f8a5f"},
+    {"conv": "#dee2e6", "ren": "#38c28f"},
 )
 
 def retrieve_data() -> Tuple[Dict[str, Any], int]:
@@ -122,6 +128,14 @@ def legend(yr: int, total: float, total_renewable: Optional[float] = None) -> st
         return f'{yr}: {total_renewable:.2f} TWh ({total_renewable / total * 100:.2f}%)'
     return f'{yr}: {total:.2f} TWh'
 
+
+def rtl(label: str, value: str) -> str:
+    """A right-to-left tooltip line: Hebrew label on the right, then the value with its unit.
+    Plotly draws tooltips as left-to-right SVG text, so without explicit embeddings the bidi algorithm
+    pushes 'GWh' past the Hebrew label or splits it from its number."""
+    return "\u202b" + label + " \u202a" + value + "\u202c\u202c"
+
+
 def log_year(yr: int, renewables: float, total: float):
     if total == 0:
         logging.info("{:.0f}: No Data".format(yr))
@@ -129,32 +143,45 @@ def log_year(yr: int, renewables: float, total: float):
         logging.info("{:.0f}: {:.2f} / {:.2f} ({:.2f}%)"
                      .format(yr, renewables / 1e3, total / 1e3, renewables / total * 100))
 
-def bar_chart_layout(nav_links):
+def bar_chart_layout():
     global last_max_year
-    return html.Div([
-        nav_links,
-        dcc.Graph(id=MAIN_GRAPH_ID, config={'displayModeBar': False}),
-        html.Div([
-            dcc.RangeSlider(
-                YEAR_FROM, last_max_year,
-                step=1,
-                value=[YEAR_FROM, last_max_year],
-                marks={yr: str(yr) for yr in range(YEAR_FROM, last_max_year + 1)},
-                id=YEAR_RANGE_SLIDER),
-        ],
-            style={'width': '50%', 'padding-left': '15%', 'display': 'inline-block', 'verticalAlign': 'middle'}),
-        html.Div([
-            dcc.Checklist(
-                id=YEARLY_CHECKBOX_ID,
-                options=[{'label': 'שנתי', 'value': YEARLY_VALUE}],
-                value=[],
-                style={'fontSize': 18}
+    controls = dmc.Group([
+        dmc.Box([
+            ui.control_label('טווח שנים'),
+            # The slider runs natively right-to-left (forcing it LTR inside the RTL page breaks dragging),
+            # so years are negated to keep the earliest year on the left like the chart's x axis.
+            dmc.RangeSlider(
+                id=YEAR_RANGE_SLIDER,
+                min=-last_max_year, max=-YEAR_FROM, step=1, minRange=0,
+                value=[-last_max_year, -YEAR_FROM],
+                marks=[{'value': -yr, 'label': str(yr)} for yr in range(YEAR_FROM, last_max_year + 1)],
+                # step=1 already snaps to whole years; restrictToMarks would stop both thumbs sharing a year
+                label=None,
+                color=CONTROL_COLOR,
+                mb='lg',
             ),
-        ],
-            style={'display': 'inline-block', 'padding-left': '5%', 'verticalAlign': 'middle'}),
-    ])
+        ], w={'base': '100%', 'sm': 420}, className='year-slider'),
+        # Both sides of each switch are equal choices, so the track keeps one colour in either state
+        dmc.Switch(id=YEARLY_SWITCH_ID, label='תצוגה שנתית/חודשית', checked=False, size='md', color=CONTROL_COLOR,
+                   className='choice-switch'),
+        dmc.Switch(id=TOTAL_SWITCH_ID, label='מתחדשות/סך הכל', checked=True, size='md', color=CONTROL_COLOR,
+                   className='choice-switch'),
+        # Percentages only make sense for renewables on their own, so this appears when totals are hidden
+        html.Div(dmc.Switch(id=PERCENT_SWITCH_ID, label='אנרגיה/אחוזים', checked=False, size='md', color=CONTROL_COLOR,
+                            className='choice-switch'),
+                 id=PERCENT_WRAPPER_ID, style={'display': 'none'}),
+    ], gap='xl', align='center', wrap='wrap')
 
-def bar_chart(cost_data_all: Dict, max_year: int, years_range: List[int], yearly: bool = False):
+    return dmc.Stack([
+        ui.page_header('ייצור חשמל בישראל', 'מתחדשות מול סך הייצור', 'sun'),
+        dmc.Card(controls),
+        ui.chart_card(dcc.Graph(id=MAIN_GRAPH_ID, config=ui.GRAPH_CONFIG),
+                      title=dmc.Text('ייצור חודשי', id=CHART_TITLE_ID, fw=700, size='lg', span=True)),
+    ], gap='md')
+
+
+def bar_chart(cost_data_all: Dict, max_year: int, years_range: List[int], yearly: bool = False,
+              show_total: bool = True, percent: bool = False):
     traces = []
     start_year, end_year = years_range if years_range else [YEAR_FROM, max_year]
 
@@ -165,36 +192,47 @@ def bar_chart(cost_data_all: Dict, max_year: int, years_range: List[int], yearly
         y = int(date_str.split('-')[2])
         data_by_year[y][date_str] = data
 
+    # Yearly view: fewer bars leave more room, so the labels grow as the year range shrinks
+    n_years = end_year - start_year + 1
+    label_size = max(16, 30 - 2 * (n_years - 1))
+    tick_size = max(12, 22 - 2 * (n_years - 1)) if yearly else None
+
     # Only iterate the years we actually need to display
     for yr in range(start_year, end_year + 1):
         year_data = data_by_year.get(yr, {})
-        trace_ren, trace_conv, total, total_ren = per_year_stacked_bar(year_data, yr, yearly=yearly)
+        trace_ren, trace_conv, total, total_ren = per_year_stacked_bar(year_data, yr, yearly=yearly,
+                                                                       label_size=label_size,
+                                                                       show_total=show_total, percent=percent)
         
-        traces.append(trace_conv)
+        if show_total:
+            traces.append(trace_conv)
         traces.append(trace_ren)
         log_year(yr, total_ren, total)
 
     fig = go.Figure(data=traces,
                     layout=go.Layout(
-                        height=800,  # showlegend=False,
-                        xaxis=go.layout.XAxis(title="", fixedrange=True, tickfont={"size": 18},
+                        height=640,
+                        bargap=0.18,
+                        bargroupgap=0.06,
+                        xaxis=go.layout.XAxis(title="", fixedrange=True, showline=False, tickfont={"size": tick_size},
                                               type="category" if yearly else None),
-                        yaxis=go.layout.YAxis(title={"text": '[MWh] ייצור', "font":{"size": 18}},
-                                              fixedrange=True,
-                                              tickfont={"size": 18},
-                                              tickformat=",.0r"),
-                        plot_bgcolor='snow',
-                        legend={"font": {"size": 16}},
-                        title=go.layout.Title(
-                            x=0.5,
-                            xanchor='center',
-                            font={"family": "Hebrew", "size": 36},
-                            text='ייצור חשמל בישראל'
-                        )))
-    fig.add_annotation(xref="paper", yref="paper", x=0, y=1, showarrow=False, text="מקור : נוגה", font={"size": 16})
+                        yaxis=go.layout.YAxis(fixedrange=True,
+                                              tickformat=",.0f", rangemode="tozero"),
+                        # The legend is informational: hiding the totals is done with the switch above the chart
+                        legend={"orientation": "h", "y": -0.12, "x": 0.5, "xanchor": "center",
+                                "itemclick": False, "itemdoubleclick": False},
+                        margin={"t": 40},
+                        hovermode="closest",
+                        hoverlabel={"align": "right"},
+                        # Many narrow bars: keep the vertical % labels legible instead of shrinking them
+                        uniformtext={"minsize": 10, "mode": "show"},
+                        ))
+    ui.axis_unit(fig, "%" if percent else "GWh")
     return fig
 
-def per_year_stacked_bar(cost_data: Dict, group: int, yearly: bool = False):
+def per_year_stacked_bar(cost_data: Dict, group: int, yearly: bool = False, label_size: int = 18,
+                         show_total: bool = True,
+                         percent: bool = False):
     total = 0
     total_renewable = 0
     y_renewable = []
@@ -221,31 +259,48 @@ def per_year_stacked_bar(cost_data: Dict, group: int, yearly: bool = False):
         y_conv_vals = [total - total_renewable]
         y_text_vals = ["{:.1%}".format(total_renewable / total) if total > 0 else ""]
         offset_grp = "yearly"
-        hover_ren = '<i>' + str(group) + ' Renewable</i>:<br>      %{y:,.0f} MWh<extra></extra>'
-        hover_conv = '<i>' + str(group) + ' Total</i>:<br>      %{y:,.0f} MWh<extra></extra>'
     else:
         x_vals = months_list
         y_ren_vals = y_renewable
         y_conv_vals = y_conventional
         y_text_vals = y_text
         offset_grp = group
-        hover_ren = '<i>%{x} ' + str(group) + ' Renewable</i>:<br>      %{y:,.0f} MWh'
-        hover_conv = '<i>%{x} ' + str(group) + ' Total</i>:<br>      %{y:,.0f} MWh'
 
-    trace_ren = go.Bar(x=x_vals, y=y_ren_vals,
-                       text=y_text_vals, textposition="outside", textfont={"size": 48},
+    # Both segments of a bar share one tooltip: total and renewables for that month/year
+    customdata = [(ren, ren + conv, pct) for ren, conv, pct in zip(y_ren_vals, y_conv_vals, y_text_vals)]
+    hover_title = '<b>%{x}</b>' if yearly else f'<b>%{{x}} {group}</b>'
+    hover = (hover_title
+             + '<br><span style="color:black">' + rtl('סך הכל:', '%{customdata[1]:,.0f} GWh') + '</span>'
+             + f'<br><span style="color:{bar_4[2]["ren"]}">' + rtl('מתחדשות:', '%{customdata[0]:,.0f} GWh / %{customdata[2]}')
+             + '</span><extra></extra>')
+    # The renewable share is labelled above the full stack (monthly) or inside the totals segment just above the
+    # renewables (yearly); when totals are hidden it goes above the renewables bar
+    label = dict(text=y_text_vals, textposition="outside", cliponaxis=False,
+                 textangle=0 if yearly else -90,
+                 textfont={"size": label_size if yearly else 11, "color": ui.TEXT_PRIMARY if yearly else ui.TEXT_SECONDARY})
+    total_label = (dict(label, textposition="inside", insidetextanchor="start") if yearly else label)
+
+    # Percent view: renewables as a share of each month's/year's total (only shown without the totals)
+    y_ren_plot = ([ren / (ren + conv) * 100 if ren + conv else 0 for ren, conv in zip(y_ren_vals, y_conv_vals)]
+                  if percent and not show_total else y_ren_vals)
+
+    trace_ren = go.Bar(x=x_vals, y=y_ren_plot,
                        offsetgroup=offset_grp,
                        name=legend(group, total / 1e3, total_renewable / 1e3),
                        marker_color=bar_4[group % 4]["ren"],
                        legendgroup="ren",
-                       legendgrouptitle={"text": "  מתחדשות  ", "font": {"size": 20}},
-                       hovertemplate=hover_ren)
+                       legendgrouptitle={"text": "מתחדשות", "font": {"size": 13}},
+                       customdata=customdata,
+                       hovertemplate=hover,
+                       **({} if show_total else label))
     trace_conv = go.Bar(x=x_vals, y=y_conv_vals,
                         offsetgroup=offset_grp, base=y_ren_vals,
                         name=legend(group, total / 1e3), marker_color=bar_4[group % 4]["conv"],
                         legendgroup="conv",
-                        legendgrouptitle={"text": "   סך הכל   ", "font": {"size": 20}},
-                        hovertemplate=hover_conv)
+                        legendgrouptitle={"text": "סך הכל", "font": {"size": 13}},
+                        customdata=customdata,
+                        hovertemplate=hover,
+                        **total_label)
     return trace_ren, trace_conv, total, total_renewable
 
 
@@ -253,10 +308,27 @@ def register_callbacks(app):
     @app.callback(
         Output(MAIN_GRAPH_ID, 'figure'),
         [Input(YEAR_RANGE_SLIDER, 'value'),
-         Input(YEARLY_CHECKBOX_ID, 'value')],
+         Input(YEARLY_SWITCH_ID, 'checked'),
+         Input(TOTAL_SWITCH_ID, 'checked'),
+         Input(PERCENT_SWITCH_ID, 'checked')],
     )
-    def update_output(range_from_slider, yearly_value):
-        yearly = YEARLY_VALUE in (yearly_value or [])
+    def update_output(range_from_slider, yearly, show_total, percent):
         response, max_year = retrieve_data()
-        fig = bar_chart(response, max_year, range_from_slider, yearly=yearly)
-        return fig
+        # The slider holds negated years (see bar_chart_layout)
+        years = sorted(-v for v in range_from_slider) if range_from_slider else None
+        return bar_chart(response, max_year, years, yearly=bool(yearly), show_total=bool(show_total),
+                         percent=bool(percent) and not show_total)
+
+    @app.callback(
+        Output(PERCENT_WRAPPER_ID, 'style'),
+        Input(TOTAL_SWITCH_ID, 'checked'),
+    )
+    def toggle_percent_switch(show_total):
+        return {'display': 'none' if show_total else 'block'}
+
+    @app.callback(
+        Output(CHART_TITLE_ID, 'children'),
+        Input(YEARLY_SWITCH_ID, 'checked'),
+    )
+    def update_chart_title(yearly):
+        return 'ייצור שנתי' if yearly else 'ייצור חודשי'
